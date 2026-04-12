@@ -5,7 +5,6 @@ import sqlite3
 import requests
 from datetime import datetime, timedelta
 import pytz
-from timezonefinder import TimezoneFinder
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -128,17 +127,24 @@ def location_exists(name: str, latitude: float, longitude: float):
 init_db()
 
 # ============ TIMEZONE HELPER ============
-tf = TimezoneFinder()
-
 def get_timezone_from_coords(latitude: float, longitude: float):
-    try:
-        timezone_str = tf.timezone_at(lat=latitude, lng=longitude)
-        if timezone_str:
-            return timezone_str
-        return "Asia/Jakarta"
-    except Exception as e:
-        print(f"Timezone error: {e}")
-        return "Asia/Jakarta"
+    """Deteksi zona waktu berdasarkan longitude (tanpa timezonefinder)"""
+    # Perkiraan sederhana berdasarkan bujur (longitude)
+    if 95 <= longitude <= 105:
+        return "Asia/Jakarta"  # WIB
+    elif 105 < longitude <= 120:
+        return "Asia/Makassar"  # WITA
+    elif 120 < longitude <= 145:
+        return "Asia/Jayapura"  # WIT
+    else:
+        # Default berdasarkan perkiraan
+        offset = int(longitude / 15)
+        if offset >= 7:
+            return "Asia/Jakarta"
+        elif offset >= 8:
+            return "Asia/Makassar"
+        else:
+            return "Asia/Jayapura"
 
 def get_local_time(latitude: float, longitude: float, timezone_str: str = None):
     try:
