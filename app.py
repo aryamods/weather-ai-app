@@ -17,8 +17,9 @@ import asyncio
 
 app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="3.0.0")
 
-# ============ KONFIGURASI AI API (GEMINI) ============
-GEMINI_API_KEY = "AIzaSyDYF3lX6hH8Iwr8JpqPBR0Of2T4OMyL8ns"
+# ============ KONFIGURASI AI API (GEMINI) ============# ============ KONFIGURASI AI API (GEMINI) ============
+import os
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 AI_AVAILABLE = False
 try:
