@@ -127,24 +127,57 @@ def location_exists(name: str, latitude: float, longitude: float):
 init_db()
 
 # ============ TIMEZONE HELPER ============
+# ============ TIMEZONE HELPER (TANPA timezonefinder) ============
+
 def get_timezone_from_coords(latitude: float, longitude: float):
-    """Deteksi zona waktu berdasarkan longitude (tanpa timezonefinder)"""
-    # Perkiraan sederhana berdasarkan bujur (longitude)
-    if 95 <= longitude <= 105:
-        return "Asia/Jakarta"  # WIB
-    elif 105 < longitude <= 120:
-        return "Asia/Makassar"  # WITA
-    elif 120 < longitude <= 145:
-        return "Asia/Jayapura"  # WIT
+    """Deteksi zona waktu berdasarkan koordinat (tanpa library eksternal)"""
+    # Daftar zona waktu berdasarkan perkiraan longitude
+    # Zona waktu Indonesia
+    if 95 <= longitude <= 141:
+        if -8 <= latitude <= 6:  # Wilayah Indonesia
+            if 95 <= longitude <= 120:
+                return "Asia/Jakarta"  # WIB
+            elif 120 < longitude <= 128:
+                return "Asia/Makassar"  # WITA
+            else:
+                return "Asia/Jayapura"  # WIT
+    
+    # Zona waktu dunia berdasarkan longitude
+    # Setiap 15 derajat = 1 jam
+    offset = int((longitude + 7.5) / 15)
+    
+    # Batasi offset antara -12 sampai +12
+    offset = max(-12, min(12, offset))
+    
+    if offset >= 0:
+        zone_name = f"Etc/GMT+{-offset}" if offset < 0 else f"Etc/GMT-{offset}"
     else:
-        # Default berdasarkan perkiraan
-        offset = int(longitude / 15)
-        if offset >= 7:
-            return "Asia/Jakarta"
-        elif offset >= 8:
-            return "Asia/Makassar"
-        else:
-            return "Asia/Jayapura"
+        zone_name = f"Etc/GMT-{offset}"
+    
+    # Mapping ke zona waktu yang dikenal
+    timezone_map = {
+        -5: "America/New_York",
+        -6: "America/Chicago", 
+        -8: "America/Los_Angeles",
+        0: "Europe/London",
+        1: "Europe/Paris",
+        2: "Europe/Helsinki",
+        3: "Asia/Riyadh",
+        4: "Asia/Dubai",
+        5: "Asia/Karachi",
+        5.5: "Asia/Kolkata",
+        6: "Asia/Dhaka",
+        7: "Asia/Jakarta",
+        8: "Asia/Makassar",
+        9: "Asia/Jayapura",
+        10: "Asia/Tokyo",
+        11: "Asia/Sakhalin",
+        12: "Pacific/Auckland"
+    }
+    
+    # Cari berdasarkan offset terdekat
+    closest_offset = min(timezone_map.keys(), key=lambda x: abs(x - offset))
+    return timezone_map.get(closest_offset, "UTC")
 
 def get_local_time(latitude: float, longitude: float, timezone_str: str = None):
     try:
@@ -280,7 +313,8 @@ def search_city(city_name: str):
             city = results[0]
             lat = city.get("latitude", 0)
             lon = city.get("longitude", 0)
-            tz = get_timezone_from_coords(lat, lon)
+            # Gunakan city name untuk menentukan zona waktu
+            tz = get_timezone_from_coords(lat, lon, city.get("name"))
             
             return {
                 "name": city.get("name", city_name),
