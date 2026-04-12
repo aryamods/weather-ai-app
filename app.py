@@ -129,10 +129,48 @@ init_db()
 # ============ TIMEZONE HELPER ============
 # ============ TIMEZONE HELPER (TANPA timezonefinder) ============
 
-def get_timezone_from_coords(latitude: float, longitude: float):
-    """Deteksi zona waktu berdasarkan koordinat (tanpa library eksternal)"""
-    # Daftar zona waktu berdasarkan perkiraan longitude
-    # Zona waktu Indonesia
+def get_timezone_from_coords(latitude: float, longitude: float, city_name: str = None):
+    """Deteksi zona waktu berdasarkan koordinat atau nama kota"""
+    
+    # Mapping kota ke zona waktu (prioritas utama)
+    city_timezones = {
+        "new york": "America/New_York",
+        "los angeles": "America/Los_Angeles",
+        "chicago": "America/Chicago",
+        "london": "Europe/London",
+        "paris": "Europe/Paris",
+        "tokyo": "Asia/Tokyo",
+        "beijing": "Asia/Shanghai",
+        "shanghai": "Asia/Shanghai",
+        "hong kong": "Asia/Hong_Kong",
+        "singapore": "Asia/Singapore",
+        "sydney": "Australia/Sydney",
+        "melbourne": "Australia/Melbourne",
+        "jakarta": "Asia/Jakarta",
+        "bandung": "Asia/Jakarta",
+        "semarang": "Asia/Jakarta",
+        "surabaya": "Asia/Jakarta",
+        "makassar": "Asia/Makassar",
+        "jayapura": "Asia/Jayapura",
+        "bali": "Asia/Makassar",
+        "denpasar": "Asia/Makassar",
+        "medan": "Asia/Jakarta",
+        "palembang": "Asia/Jakarta",
+        "padang": "Asia/Jakarta",
+        "pekanbaru": "Asia/Jakarta",
+        "manado": "Asia/Makassar",
+        "kupang": "Asia/Makassar",
+        "ambon": "Asia/Jayapura",
+        "ternate": "Asia/Jayapura",
+        "sorong": "Asia/Jayapura",
+    }
+    
+    if city_name:
+        city_lower = city_name.lower()
+        if city_lower in city_timezones:
+            return city_timezones[city_lower]
+    
+    # Zona waktu Indonesia berdasarkan koordinat
     if 95 <= longitude <= 141:
         if -8 <= latitude <= 6:  # Wilayah Indonesia
             if 95 <= longitude <= 120:
@@ -148,11 +186,6 @@ def get_timezone_from_coords(latitude: float, longitude: float):
     
     # Batasi offset antara -12 sampai +12
     offset = max(-12, min(12, offset))
-    
-    if offset >= 0:
-        zone_name = f"Etc/GMT+{-offset}" if offset < 0 else f"Etc/GMT-{offset}"
-    else:
-        zone_name = f"Etc/GMT-{offset}"
     
     # Mapping ke zona waktu yang dikenal
     timezone_map = {
