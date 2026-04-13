@@ -5,7 +5,6 @@ import sqlite3
 import requests
 from datetime import datetime, timedelta
 import pytz
-from timezonefinder import TimezoneFinder
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -13,7 +12,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 import os
-import asyncio
 
 app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="3.0.0")
 
@@ -127,18 +125,67 @@ def location_exists(name: str, latitude: float, longitude: float):
 
 init_db()
 
-# ============ TIMEZONE HELPER ============
-tf = TimezoneFinder()
+# ============ TIMEZONE HELPER (TANPA timezonefinder) ============
 
 def get_timezone_from_coords(latitude: float, longitude: float):
-    try:
-        timezone_str = tf.timezone_at(lat=latitude, lng=longitude)
-        if timezone_str:
-            return timezone_str
+    """Deteksi zona waktu berdasarkan koordinat (tanpa library eksternal)"""
+    
+    # Zona waktu Indonesia
+    if 95 <= longitude <= 141:
+        if -8 <= latitude <= 6:  # Wilayah Indonesia
+            if 95 <= longitude <= 120:
+                return "Asia/Jakarta"  # WIB
+            elif 120 < longitude <= 128:
+                return "Asia/Makassar"  # WITA
+            else:
+                return "Asia/Jayapura"  # WIT
+    
+    # Zona waktu dunia berdasarkan longitude
+    # Setiap 15 derajat = 1 jam
+    offset = int((longitude + 7.5) / 15)
+    
+    # Batasi offset antara -12 sampai +12
+    offset = max(-12, min(12, offset))
+    
+    # Mapping ke zona waktu yang dikenal
+    if offset == -5:
+        return "America/New_York"
+    elif offset == -6:
+        return "America/Chicago"
+    elif offset == -7:
+        return "America/Denver"
+    elif offset == -8:
+        return "America/Los_Angeles"
+    elif offset == 0:
+        return "Europe/London"
+    elif offset == 1:
+        return "Europe/Paris"
+    elif offset == 2:
+        return "Europe/Helsinki"
+    elif offset == 3:
+        return "Asia/Riyadh"
+    elif offset == 4:
+        return "Asia/Dubai"
+    elif offset == 5:
+        return "Asia/Karachi"
+    elif offset == 5.5:
+        return "Asia/Kolkata"
+    elif offset == 6:
+        return "Asia/Dhaka"
+    elif offset == 7:
         return "Asia/Jakarta"
-    except Exception as e:
-        print(f"Timezone error: {e}")
-        return "Asia/Jakarta"
+    elif offset == 8:
+        return "Asia/Makassar"
+    elif offset == 9:
+        return "Asia/Jayapura"
+    elif offset == 10:
+        return "Asia/Tokyo"
+    elif offset == 11:
+        return "Asia/Sakhalin"
+    elif offset == 12:
+        return "Pacific/Auckland"
+    else:
+        return "UTC"
 
 def get_local_time(latitude: float, longitude: float, timezone_str: str = None):
     try:
