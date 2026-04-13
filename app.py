@@ -5,6 +5,7 @@ import sqlite3
 import requests
 from datetime import datetime, timedelta
 import pytz
+from timezonefinder import TimezoneFinder
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -16,7 +17,7 @@ import asyncio
 
 app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="3.0.0")
 
-# ============ KONFIGURASI AI API (GEMINI) ============# ============ KONFIGURASI AI API (GEMINI) ============
+# ============ KONFIGURASI AI API (GEMINI) ============
 import os
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
@@ -127,90 +128,17 @@ def location_exists(name: str, latitude: float, longitude: float):
 init_db()
 
 # ============ TIMEZONE HELPER ============
-# ============ TIMEZONE HELPER (TANPA timezonefinder) ============
+tf = TimezoneFinder()
 
-def get_timezone_from_coords(latitude: float, longitude: float, city_name: str = None):
-    """Deteksi zona waktu berdasarkan koordinat atau nama kota"""
-    
-    # Mapping kota ke zona waktu (prioritas utama)
-    city_timezones = {
-        "new york": "America/New_York",
-        "los angeles": "America/Los_Angeles",
-        "chicago": "America/Chicago",
-        "london": "Europe/London",
-        "paris": "Europe/Paris",
-        "tokyo": "Asia/Tokyo",
-        "beijing": "Asia/Shanghai",
-        "shanghai": "Asia/Shanghai",
-        "hong kong": "Asia/Hong_Kong",
-        "singapore": "Asia/Singapore",
-        "sydney": "Australia/Sydney",
-        "melbourne": "Australia/Melbourne",
-        "jakarta": "Asia/Jakarta",
-        "bandung": "Asia/Jakarta",
-        "semarang": "Asia/Jakarta",
-        "surabaya": "Asia/Jakarta",
-        "makassar": "Asia/Makassar",
-        "jayapura": "Asia/Jayapura",
-        "bali": "Asia/Makassar",
-        "denpasar": "Asia/Makassar",
-        "medan": "Asia/Jakarta",
-        "palembang": "Asia/Jakarta",
-        "padang": "Asia/Jakarta",
-        "pekanbaru": "Asia/Jakarta",
-        "manado": "Asia/Makassar",
-        "kupang": "Asia/Makassar",
-        "ambon": "Asia/Jayapura",
-        "ternate": "Asia/Jayapura",
-        "sorong": "Asia/Jayapura",
-    }
-    
-    if city_name:
-        city_lower = city_name.lower()
-        if city_lower in city_timezones:
-            return city_timezones[city_lower]
-    
-    # Zona waktu Indonesia berdasarkan koordinat
-    if 95 <= longitude <= 141:
-        if -8 <= latitude <= 6:  # Wilayah Indonesia
-            if 95 <= longitude <= 120:
-                return "Asia/Jakarta"  # WIB
-            elif 120 < longitude <= 128:
-                return "Asia/Makassar"  # WITA
-            else:
-                return "Asia/Jayapura"  # WIT
-    
-    # Zona waktu dunia berdasarkan longitude
-    # Setiap 15 derajat = 1 jam
-    offset = int((longitude + 7.5) / 15)
-    
-    # Batasi offset antara -12 sampai +12
-    offset = max(-12, min(12, offset))
-    
-    # Mapping ke zona waktu yang dikenal
-    timezone_map = {
-        -5: "America/New_York",
-        -6: "America/Chicago", 
-        -8: "America/Los_Angeles",
-        0: "Europe/London",
-        1: "Europe/Paris",
-        2: "Europe/Helsinki",
-        3: "Asia/Riyadh",
-        4: "Asia/Dubai",
-        5: "Asia/Karachi",
-        5.5: "Asia/Kolkata",
-        6: "Asia/Dhaka",
-        7: "Asia/Jakarta",
-        8: "Asia/Makassar",
-        9: "Asia/Jayapura",
-        10: "Asia/Tokyo",
-        11: "Asia/Sakhalin",
-        12: "Pacific/Auckland"
-    }
-    
-    # Cari berdasarkan offset terdekat
-    closest_offset = min(timezone_map.keys(), key=lambda x: abs(x - offset))
-    return timezone_map.get(closest_offset, "UTC")
+def get_timezone_from_coords(latitude: float, longitude: float):
+    try:
+        timezone_str = tf.timezone_at(lat=latitude, lng=longitude)
+        if timezone_str:
+            return timezone_str
+        return "Asia/Jakarta"
+    except Exception as e:
+        print(f"Timezone error: {e}")
+        return "Asia/Jakarta"
 
 def get_local_time(latitude: float, longitude: float, timezone_str: str = None):
     try:
@@ -346,8 +274,7 @@ def search_city(city_name: str):
             city = results[0]
             lat = city.get("latitude", 0)
             lon = city.get("longitude", 0)
-            # Gunakan city name untuk menentukan zona waktu
-            tz = get_timezone_from_coords(lat, lon, city.get("name"))
+            tz = get_timezone_from_coords(lat, lon)
             
             return {
                 "name": city.get("name", city_name),
