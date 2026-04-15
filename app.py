@@ -12,11 +12,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 import os
+import json
 
-app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="3.0.0")
+app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="4.0.0")
 
 # ============ KONFIGURASI AI API (GEMINI) ============
-import os
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 AI_AVAILABLE = False
@@ -54,9 +54,7 @@ def init_db():
     cursor.execute("PRAGMA table_info(saved_locations)")
     columns = [column[1] for column in cursor.fetchall()]
     if 'timezone' not in columns:
-        print("⚠️ Menambahkan kolom timezone ke database...")
         cursor.execute('ALTER TABLE saved_locations ADD COLUMN timezone TEXT')
-        print("✅ Kolom timezone berhasil ditambahkan")
     
     conn.commit()
     conn.close()
@@ -125,67 +123,58 @@ def location_exists(name: str, latitude: float, longitude: float):
 
 init_db()
 
-# ============ TIMEZONE HELPER (TANPA timezonefinder) ============
+# ============ REVERSE GEOCODING ============
+def reverse_geocode(latitude: float, longitude: float):
+    """Dapatkan nama kota dari koordinat GPS"""
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "current": ["temperature_2m"],
+        "timezone": "auto"
+    }
+    try:
+        response = requests.get(url, params=params, timeout=30)
+        data = response.json()
+        timezone = data.get("timezone", "auto")
+        
+        # Gunakan API geocoding terbalik
+        geo_url = f"https://nominatim.openstreetmap.org/reverse?lat={latitude}&lon={longitude}&format=json"
+        geo_response = requests.get(geo_url, headers={"User-Agent": "WeatherAI/1.0"}, timeout=30)
+        geo_data = geo_response.json()
+        
+        if geo_data and 'address' in geo_data:
+            city = geo_data['address'].get('city') or geo_data['address'].get('town') or geo_data['address'].get('village') or geo_data['address'].get('state') or "Unknown"
+            country = geo_data['address'].get('country', "")
+            return city, country, timezone
+    except Exception as e:
+        print(f"Reverse geocode error: {e}")
+    
+    return None, None, None
 
 def get_timezone_from_coords(latitude: float, longitude: float):
-    """Deteksi zona waktu berdasarkan koordinat (tanpa library eksternal)"""
-    
     # Zona waktu Indonesia
     if 95 <= longitude <= 141:
-        if -8 <= latitude <= 6:  # Wilayah Indonesia
+        if -8 <= latitude <= 6:
             if 95 <= longitude <= 120:
-                return "Asia/Jakarta"  # WIB
+                return "Asia/Jakarta"
             elif 120 < longitude <= 128:
-                return "Asia/Makassar"  # WITA
+                return "Asia/Makassar"
             else:
-                return "Asia/Jayapura"  # WIT
+                return "Asia/Jayapura"
     
-    # Zona waktu dunia berdasarkan longitude
-    # Setiap 15 derajat = 1 jam
     offset = int((longitude + 7.5) / 15)
-    
-    # Batasi offset antara -12 sampai +12
     offset = max(-12, min(12, offset))
     
-    # Mapping ke zona waktu yang dikenal
-    if offset == -5:
-        return "America/New_York"
-    elif offset == -6:
-        return "America/Chicago"
-    elif offset == -7:
-        return "America/Denver"
-    elif offset == -8:
-        return "America/Los_Angeles"
-    elif offset == 0:
-        return "Europe/London"
-    elif offset == 1:
-        return "Europe/Paris"
-    elif offset == 2:
-        return "Europe/Helsinki"
-    elif offset == 3:
-        return "Asia/Riyadh"
-    elif offset == 4:
-        return "Asia/Dubai"
-    elif offset == 5:
-        return "Asia/Karachi"
-    elif offset == 5.5:
-        return "Asia/Kolkata"
-    elif offset == 6:
-        return "Asia/Dhaka"
-    elif offset == 7:
-        return "Asia/Jakarta"
-    elif offset == 8:
-        return "Asia/Makassar"
-    elif offset == 9:
-        return "Asia/Jayapura"
-    elif offset == 10:
-        return "Asia/Tokyo"
-    elif offset == 11:
-        return "Asia/Sakhalin"
-    elif offset == 12:
-        return "Pacific/Auckland"
-    else:
-        return "UTC"
+    timezone_map = {
+        -5: "America/New_York", -6: "America/Chicago", -7: "America/Denver",
+        -8: "America/Los_Angeles", 0: "Europe/London", 1: "Europe/Paris",
+        2: "Europe/Helsinki", 3: "Asia/Riyadh", 4: "Asia/Dubai",
+        5: "Asia/Karachi", 5.5: "Asia/Kolkata", 6: "Asia/Dhaka",
+        7: "Asia/Jakarta", 8: "Asia/Makassar", 9: "Asia/Jayapura",
+        10: "Asia/Tokyo", 11: "Asia/Sakhalin", 12: "Pacific/Auckland"
+    }
+    return timezone_map.get(offset, "UTC")
 
 def get_local_time(latitude: float, longitude: float, timezone_str: str = None):
     try:
@@ -767,24 +756,68 @@ body {
     overflow-x: hidden;
 }
 
-.greeting-icon {
-    display: inline-block;
-    animation: wave 0.5s ease;
+/* ============ GPS BUTTON STYLES ============ */
+.gps-btn {
+    background: var(--accent-gradient);
+    border: none;
+    border-radius: 50px;
+    padding: 12px 24px;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 12px;
 }
 
-@keyframes wave {
-    0% { transform: rotate(0deg); }
-    50% { transform: rotate(15deg); }
-    100% { transform: rotate(0deg); }
+.gps-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
 }
 
-.hero-title {
+.gps-btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.gps-btn i {
+    font-size: 14px;
+}
+
+/* ============ LOCATION TOAST ============ */
+.location-toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    padding: 12px 24px;
+    border-radius: 50px;
     display: flex;
     align-items: center;
     gap: 12px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--accent);
+    z-index: 1000;
+    transition: transform 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
 }
 
-/* ============ LOADING ANIMATION ============ */
+.location-toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.location-toast i {
+    color: var(--accent);
+    font-size: 18px;
+}
+
+/* ============ LOADING STATES ============ */
 .loader-wrapper {
     position: fixed;
     top: 0;
@@ -829,282 +862,7 @@ body {
     color: transparent;
 }
 
-.loader-dots {
-    display: inline-block;
-    width: 20px;
-    text-align: left;
-}
-
-.loader-dots::after {
-    content: '...';
-    animation: dots 1.5s steps(4, end) infinite;
-}
-
-@keyframes dots {
-    0%, 20% { content: ''; }
-    40% { content: '.'; }
-    60% { content: '..'; }
-    80%, 100% { content: '...'; }
-}
-
-/* ============ PAGE TRANSITION ============ */
-.page-transition {
-    animation: pageFadeIn 0.5s ease-out;
-}
-
-@keyframes pageFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ============ NAVBAR ACTIVE ANIMATION ============ */
-.nav-item {
-    position: relative;
-    overflow: hidden;
-}
-
-.nav-item::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.2), transparent);
-    transition: left 0.5s ease;
-}
-
-.nav-item:hover::before {
-    left: 100%;
-}
-
-.nav-item.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-    border-left: 3px solid var(--accent);
-    transform: translateX(4px);
-}
-
-/* ============ TRAINING MODAL ============ */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    z-index: 10000;
-    justify-content: center;
-    align-items: center;
-    animation: modalFadeIn 0.3s ease;
-}
-
-@keyframes modalFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal.active {
-    display: flex;
-}
-
-.modal-content {
-    background: var(--card-bg);
-    backdrop-filter: blur(20px);
-    border-radius: 32px;
-    padding: 40px;
-    text-align: center;
-    max-width: 400px;
-    width: 90%;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-xl);
-    animation: modalPop 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
-}
-
-@keyframes modalPop {
-    from {
-        opacity: 0;
-        transform: scale(0.8);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-.modal-icon {
-    font-size: 64px;
-    margin-bottom: 20px;
-    animation: spin 2s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.modal-title {
-    font-size: 24px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    background: var(--ml-gradient);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-
-.modal-message {
-    color: var(--text-tertiary);
-    margin-bottom: 24px;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 6px;
-    background: var(--bg-tertiary);
-    border-radius: 3px;
-    overflow: hidden;
-    margin: 20px 0;
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--ml-gradient);
-    width: 0%;
-    border-radius: 3px;
-    animation: progressPulse 1s ease infinite;
-}
-
-@keyframes progressPulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
-}
-
-/* ============ CARD HOVER ANIMATIONS ============ */
-.glass-card, .weather-hero, .stat-card, .forecast-item {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.glass-card:hover, .weather-hero:hover {
-    transform: translateY(-6px);
-    box-shadow: var(--shadow-xl);
-}
-
-.stat-card:hover, .forecast-item:hover {
-    transform: translateY(-4px) scale(1.02);
-}
-
-/* ============ SIDEBAR TRANSITION ============ */
-.sidebar {
-    transition: left 0.3s ease, transform 0.3s ease;
-}
-
-/* ============ THEME TOGGLE ANIMATION ============ */
-.theme-toggle {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.theme-toggle:hover {
-    transform: scale(1.1) rotate(15deg);
-}
-
-/* ============ SEARCH BAR ANIMATION ============ */
-.search-container {
-    transition: all 0.3s ease;
-}
-
-.search-container:focus-within {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(59, 130, 246, 0.2);
-}
-
-.search-btn {
-    transition: all 0.3s ease;
-}
-
-.search-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
-}
-
-/* ============ TRAINING BUTTON ANIMATION ============ */
-.train-btn {
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.train-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: left 0.5s ease;
-}
-
-.train-btn:hover::before {
-    left: 100%;
-}
-
-.train-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
-}
-
-.train-btn.loading {
-    pointer-events: none;
-    opacity: 0.7;
-}
-
-/* ============ Skeleton Loading ============ */
-.skeleton {
-    background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--border-color) 50%, var(--bg-tertiary) 75%);
-    background-size: 200% 100%;
-    animation: skeletonWave 1.5s ease infinite;
-    border-radius: 12px;
-}
-
-@keyframes skeletonWave {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
-/* ============ REST OF STYLES ============ */
-.aura-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 0;
-    pointer-events: none;
-}
-
-.aura-glow {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(99, 102, 241, 0.06) 0%, transparent 50%);
-    animation: auraPulse 12s ease infinite;
-}
-
-@keyframes auraPulse {
-    0%, 100% { opacity: 0.6; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.02); }
-}
-
+/* ============ RESPONSIVE GRID ============ */
 .app {
     display: flex;
     min-height: 100vh;
@@ -1123,8 +881,177 @@ body {
     height: 100vh;
     transition: var(--transition);
     z-index: 100;
+    overflow-y: auto;
 }
 
+/* Mobile sidebar */
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: -300px;
+        z-index: 150;
+        transition: left 0.3s ease;
+    }
+    
+    .sidebar.open {
+        left: 0;
+        box-shadow: 4px 0 30px rgba(0,0,0,0.2);
+    }
+    
+    .main {
+        padding: 20px 16px !important;
+    }
+}
+
+.main {
+    flex: 1;
+    padding: 32px 44px;
+    overflow-x: hidden;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .stats-grid {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .forecast-grid {
+        gap: 12px;
+    }
+    
+    .forecast-item {
+        padding: 12px 8px;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 24px !important;
+        flex-wrap: wrap;
+    }
+    
+    .weather-hero {
+        padding: 20px !important;
+    }
+    
+    .weather-main {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .weather-temp {
+        font-size: 56px !important;
+    }
+    
+    .temp-unit {
+        font-size: 24px !important;
+    }
+    
+    .weather-icon {
+        font-size: 56px !important;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        width: 100%;
+    }
+    
+    .stat-card {
+        padding: 12px !important;
+        min-width: auto !important;
+    }
+    
+    .stat-value {
+        font-size: 18px !important;
+    }
+    
+    .forecast-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 10px;
+    }
+    
+    .bento-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+    
+    .glass-card {
+        padding: 20px !important;
+    }
+    
+    .search-container {
+        flex-direction: column;
+        border-radius: 28px;
+        padding: 12px;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: 12px 16px;
+    }
+    
+    .search-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .info-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 8px;
+    }
+    
+    .info-icon {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main {
+        padding: 16px 12px !important;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .forecast-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .hero-title {
+        font-size: 20px !important;
+    }
+    
+    .hero-subtitle {
+        font-size: 12px;
+    }
+    
+    .modal-content {
+        padding: 24px !important;
+        margin: 16px;
+    }
+}
+
+/* ============ HOVER EFFECTS ============ */
+.glass-card, .weather-hero, .stat-card, .forecast-item {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover, .weather-hero:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+}
+
+.stat-card:hover, .forecast-item:hover {
+    transform: translateY(-2px) scale(1.01);
+}
+
+/* ============ SIDEBAR STYLES ============ */
 .sidebar-header {
     display: flex;
     align-items: center;
@@ -1145,12 +1072,6 @@ body {
     font-size: 24px;
     color: white;
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
-    animation: logoPulse 2s ease infinite;
-}
-
-@keyframes logoPulse {
-    0%, 100% { box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); }
-    50% { box-shadow: 0 8px 30px rgba(59, 130, 246, 0.6); }
 }
 
 .sidebar-logo-text {
@@ -1277,76 +1198,7 @@ body {
     color: white;
 }
 
-.main {
-    flex: 1;
-    padding: 32px 44px;
-    overflow-x: hidden;
-}
-
-.hero {
-    margin-bottom: 36px;
-}
-
-.hero-title {
-    font-size: 36px;
-    font-weight: 800;
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    margin-bottom: 10px;
-}
-
-.hero-subtitle {
-    font-size: 15px;
-    color: var(--text-tertiary);
-}
-
-.search-container {
-    background: var(--card-bg);
-    backdrop-filter: blur(12px);
-    border-radius: 60px;
-    padding: 6px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 32px;
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    transition: var(--transition);
-}
-
-.search-container:focus-within {
-    box-shadow: 0 8px 28px rgba(59, 130, 246, 0.2);
-    border-color: var(--accent);
-}
-
-.search-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    padding: 14px 24px;
-    font-size: 15px;
-    color: var(--text-primary);
-    font-family: inherit;
-}
-
-.search-input:focus {
-    outline: none;
-}
-
-.search-btn {
-    background: var(--accent-gradient);
-    border: none;
-    border-radius: 50px;
-    padding: 12px 32px;
-    color: white;
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
+/* ============ WEATHER HERO ============ */
 .weather-hero {
     background: var(--card-bg);
     backdrop-filter: blur(12px);
@@ -1355,7 +1207,6 @@ body {
     margin-bottom: 32px;
     border: 1px solid var(--glass-border);
     box-shadow: var(--shadow-lg);
-    transition: var(--transition);
 }
 
 .weather-main {
@@ -1400,6 +1251,7 @@ body {
     margin-top: 6px;
 }
 
+/* ============ STATS GRID ============ */
 .stats-grid {
     display: flex;
     gap: 20px;
@@ -1414,12 +1266,6 @@ body {
     min-width: 110px;
     transition: var(--transition);
     border: 1px solid transparent;
-}
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    background: var(--accent-soft);
-    border-color: var(--accent);
 }
 
 .stat-icon {
@@ -1441,6 +1287,7 @@ body {
     margin-top: 6px;
 }
 
+/* ============ BENTO GRID ============ */
 .bento-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -1484,10 +1331,17 @@ body {
     gap: 8px;
 }
 
+/* ============ FORECAST GRID ============ */
 .forecast-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 16px;
+}
+
+@media (max-width: 768px) {
+    .forecast-grid {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
 }
 
 .forecast-item {
@@ -1497,12 +1351,6 @@ body {
     border-radius: 24px;
     transition: var(--transition);
     border: 1px solid transparent;
-}
-
-.forecast-item:hover {
-    transform: translateY(-5px);
-    background: var(--accent-soft);
-    border-color: var(--accent);
 }
 
 .forecast-day {
@@ -1537,6 +1385,7 @@ body {
     margin-top: 6px;
 }
 
+/* ============ ML BADGE ============ */
 .ml-badge {
     display: inline-block;
     background: var(--ml-gradient);
@@ -1561,12 +1410,19 @@ body {
     margin-top: 16px;
 }
 
+.train-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+}
+
+/* ============ INSIGHTS ============ */
 .insights-text {
     line-height: 1.8;
     font-size: 15px;
     color: var(--text-primary);
 }
 
+/* ============ INFO ROW ============ */
 .info-row {
     display: flex;
     flex-direction: column;
@@ -1617,6 +1473,7 @@ body {
     margin-top: 6px;
 }
 
+/* ============ FLASH MESSAGES ============ */
 .flash {
     padding: 16px 24px;
     border-radius: 32px;
@@ -1650,6 +1507,7 @@ body {
     color: var(--danger);
 }
 
+/* ============ THEME TOGGLE ============ */
 .theme-toggle {
     position: fixed;
     bottom: 28px;
@@ -1692,12 +1550,19 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
+@media (max-width: 768px) {
+    .menu-toggle {
+        display: flex;
+    }
+}
+
 .menu-toggle:hover, .theme-toggle:hover {
     transform: scale(1.1);
     background: var(--accent-gradient);
     color: white;
 }
 
+/* ============ FOOTER ============ */
 .footer {
     text-align: center;
     padding: 28px;
@@ -1707,6 +1572,7 @@ body {
     margin-top: 40px;
 }
 
+/* ============ SCROLLBAR ============ */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -1722,77 +1588,116 @@ body {
     border-radius: 10px;
 }
 
-@media (max-width: 768px) {
-    .sidebar {
-        position: fixed;
-        left: -300px;
-        z-index: 150;
-        transition: left 0.3s ease;
+/* ============ MODAL ============ */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+    animation: modalFadeIn 0.3s ease;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: 32px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-xl);
+    animation: modalPop 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+@keyframes modalPop {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
     }
-    
-    .sidebar.open {
-        left: 0;
-        box-shadow: 4px 0 30px rgba(0,0,0,0.2);
-    }
-    
-    .main {
-        padding: 20px;
-    }
-    
-    .weather-hero {
-        padding: 24px;
-    }
-    
-    .weather-temp {
-        font-size: 56px;
-    }
-    
-    .temp-unit {
-        font-size: 24px;
-    }
-    
-    .weather-icon {
-        font-size: 56px;
-    }
-    
-    .forecast-grid {
-        gap: 10px;
-    }
-    
-    .forecast-item {
-        padding: 12px 6px;
-    }
-    
-    .forecast-icon {
-        font-size: 24px;
-    }
-    
-    .forecast-temp {
-        font-size: 14px;
-    }
-    
-    .stat-card {
-        padding: 14px 18px;
-        min-width: 90px;
-    }
-    
-    .stat-value {
-        font-size: 18px;
-    }
-    
-    .menu-toggle {
-        display: flex;
-    }
-    
-    .hero-title {
-        font-size: 28px;
+    to {
+        opacity: 1;
+        transform: scale(1);
     }
 }
 
-@media (min-width: 769px) {
-    .menu-toggle {
-        display: none;
-    }
+.modal-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.modal-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    background: var(--ml-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--ml-gradient);
+    width: 0%;
+    border-radius: 3px;
+    animation: progressPulse 1s ease infinite;
+}
+
+@keyframes progressPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* ============ AURA BACKGROUND ============ */
+.aura-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.aura-glow {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(99, 102, 241, 0.06) 0%, transparent 50%);
+    animation: auraPulse 12s ease infinite;
+}
+
+@keyframes auraPulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.02); }
 }
 """
 
@@ -1846,7 +1751,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
     <meta name="theme-color" content="#0f172a">
     <meta name="description" content="WeatherAI - Aplikasi Prediksi Cuaca Cerdas Berbasis AI dengan akurasi tinggi. Informasi cuaca real-time, prakiraan 5 hari, dan analisis AI.">
     <meta name="keywords" content="cuaca, prediksi cuaca, weather, AI, weather forecast, Indonesia, gemini AI, machine learning">
@@ -1869,6 +1774,12 @@ def render_page(content: str, active: str = "home", message: str = None, message
                 WeatherAI<span class="loader-dots"></span>
             </div>
         </div>
+    </div>
+
+    <!-- LOCATION TOAST -->
+    <div class="location-toast" id="locationToast">
+        <i class="fas fa-map-marker-alt"></i>
+        <span id="toastMessage">Mendeteksi lokasi Anda...</span>
     </div>
 
     <!-- TRAINING MODAL -->
@@ -1955,13 +1866,120 @@ def render_page(content: str, active: str = "home", message: str = None, message
             }}, 500);
         }});
         
-        // PAGE TRANSITION ON NAVIGATION
+        // GPS AUTO DETECTION
+        let gpsDetected = false;
+        
+        function showToast(message, isError = false) {{
+            const toast = document.getElementById('locationToast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.innerHTML = message;
+            toast.style.background = isError ? 'rgba(239, 68, 68, 0.9)' : '';
+            toast.classList.add('show');
+            setTimeout(() => {{
+                toast.classList.remove('show');
+            }}, 3000);
+        }}
+        
+        function detectLocation() {{
+            if (gpsDetected) return;
+            
+            if (!navigator.geolocation) {{
+                showToast('❌ Browser Anda tidak mendukung GPS', true);
+                return;
+            }}
+            
+            showToast('📍 Mendeteksi lokasi Anda...');
+            
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {{
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    showToast('📍 Mendapatkan informasi kota...');
+                    
+                    try {{
+                        // Get city name from coordinates
+                        const response = await fetch(`/api/reverse-geocode?lat=${{lat}}&lng=${{lng}}`);
+                        const data = await response.json();
+                        
+                        if (data.success && data.city) {{
+                            // Save to database via API
+                            const saveResponse = await fetch('/api/save-location', {{
+                                method: 'POST',
+                                headers: {{ 'Content-Type': 'application/json' }},
+                                body: JSON.stringify({{
+                                    name: data.city,
+                                    latitude: lat,
+                                    longitude: lng,
+                                    country: data.country,
+                                    timezone: data.timezone
+                                }})
+                            }});
+                            
+                            const saveData = await saveResponse.json();
+                            
+                            if (saveData.success) {{
+                                showToast(`✅ Lokasi terdeteksi: ${{data.city}}`);
+                                gpsDetected = true;
+                                // Reload page to show weather for detected location
+                                setTimeout(() => {{
+                                    window.location.href = '/';
+                                }}, 1500);
+                            }} else if (saveData.exists) {{
+                                showToast(`📍 Lokasi ${{data.city}} sudah tersimpan`);
+                                gpsDetected = true;
+                                setTimeout(() => {{
+                                    window.location.href = '/';
+                                }}, 1500);
+                            }} else {{
+                                showToast(`⚠️ Gagal menyimpan lokasi`, true);
+                            }}
+                        }} else {{
+                            showToast(`⚠️ Tidak dapat menentukan nama kota`, true);
+                        }}
+                    }} catch (error) {{
+                        console.error('GPS error:', error);
+                        showToast(`❌ Gagal mendapatkan informasi lokasi`, true);
+                    }}
+                }},
+                (error) => {{
+                    let errorMessage = '❌ Gagal mendapatkan lokasi';
+                    switch(error.code) {{
+                        case error.PERMISSION_DENIED:
+                            errorMessage = '❌ Izin lokasi ditolak. Aktifkan GPS untuk deteksi otomatis.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage = '❌ Informasi lokasi tidak tersedia';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage = '❌ Waktu deteksi lokasi habis';
+                            break;
+                    }}
+                    showToast(errorMessage, true);
+                }},
+                {{
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }}
+            );
+        }}
+        
+        // Auto detect on page load (only once)
+        setTimeout(() => {{
+            const hasLocation = window.currentLocation && window.currentLocation.name !== 'Jakarta';
+            if (!hasLocation && !localStorage.getItem('gps_detected')) {{
+                detectLocation();
+                localStorage.setItem('gps_detected', 'true');
+            }}
+        }}, 1000);
+        
+        // PAGE TRANSITION
         document.querySelectorAll('.nav-item').forEach(link => {{
             link.addEventListener('click', function(e) {{
                 e.preventDefault();
                 const href = this.getAttribute('href');
                 
-                // Add transition effect
                 document.getElementById('mainContent').style.opacity = '0';
                 document.getElementById('mainContent').style.transform = 'translateY(20px)';
                 
@@ -1971,12 +1989,11 @@ def render_page(content: str, active: str = "home", message: str = None, message
             }});
         }});
         
-        // TRAINING MODAL FUNCTIONS
+        // TRAINING MODAL
         function showTrainingModal() {{
             const modal = document.getElementById('trainingModal');
             modal.classList.add('active');
             
-            // Animate progress bar
             const progressFill = document.getElementById('progressFill');
             const statusText = document.getElementById('trainingStatus');
             let progress = 0;
@@ -2011,13 +2028,11 @@ def render_page(content: str, active: str = "home", message: str = None, message
             document.getElementById('progressFill').style.width = '0%';
         }}
         
-        // Handle training form submission
         document.querySelectorAll('form[action="/train-model"]').forEach(form => {{
             form.addEventListener('submit', function(e) {{
                 e.preventDefault();
                 showTrainingModal();
                 
-                // Submit the form
                 fetch('/train-model', {{
                     method: 'GET',
                     headers: {{
@@ -2113,7 +2128,6 @@ def render_page(content: str, active: str = "home", message: str = None, message
         setInterval(updateRealTimeClock, 1000);
         updateRealTimeClock();
         
-        // Flash message auto hide
         setTimeout(() => {{
             const flash = document.querySelector('.flash');
             if (flash) {{
@@ -2124,6 +2138,32 @@ def render_page(content: str, active: str = "home", message: str = None, message
     </script>
 </body>
 </html>'''
+
+# ============ API ENDPOINTS ============
+
+@app.get("/api/reverse-geocode")
+async def api_reverse_geocode(lat: float, lng: float):
+    """API untuk reverse geocoding dari koordinat GPS"""
+    city, country, timezone = reverse_geocode(lat, lng)
+    if city:
+        return {"success": True, "city": city, "country": country, "timezone": timezone or get_timezone_from_coords(lat, lng)}
+    return {"success": False, "error": "Could not determine location"}
+
+@app.post("/api/save-location")
+async def api_save_location(request: Request):
+    """API untuk menyimpan lokasi dari GPS"""
+    data = await request.json()
+    name = data.get("name")
+    latitude = data.get("latitude")
+    longitude = data.get("longitude")
+    country = data.get("country")
+    timezone = data.get("timezone")
+    
+    if location_exists(name, latitude, longitude):
+        return {"success": False, "exists": True, "message": "Location already saved"}
+    
+    save_location(name, latitude, longitude, country, timezone)
+    return {"success": True, "message": "Location saved"}
 
 # ============ ROUTES ============
 
@@ -2149,7 +2189,6 @@ async def home(request: Request):
     
     local_info = get_local_time(selected_location["latitude"], selected_location["longitude"], selected_location.get("timezone"))
     
-    # Tentukan sapaan berdasarkan jam lokal
     hour = local_info["hour"]
     if 3 <= hour < 11:
         greeting = "Pagi"
@@ -2164,7 +2203,6 @@ async def home(request: Request):
         greeting = "Malam"
         greeting_icon = "🌙"
     
-    # Forecast API HTML
     forecast_html = ""
     for day in forecast_api[:5]:
         forecast_html += f'''
@@ -2178,7 +2216,6 @@ async def home(request: Request):
         </div>
         '''
     
-    # UV color
     uv = weather.get("uv_index", 5)
     if uv > 8:
         uv_color = "#f97316"
@@ -2187,7 +2224,6 @@ async def home(request: Request):
     else:
         uv_color = "#eab308"
     
-    # Timezone display
     tz_display = selected_location.get("timezone", "Asia/Jakarta").split('/')[-1].replace('_', ' ')
     if tz_display == "Jakarta":
         tz_display = "WIB"
@@ -2306,13 +2342,11 @@ async def ml_dashboard(request: Request):
     saved_locations = get_saved_locations()
     weather = get_current_weather(selected_location["latitude"], selected_location["longitude"])
     
-    # ML Predictions
     ml_predictions = weather_predictor.predict_temperature(weather)
     model_info = weather_predictor.get_model_info()
     
     local_info = get_local_time(selected_location["latitude"], selected_location["longitude"], selected_location.get("timezone"))
     
-    # ML Predictions HTML
     ml_forecast_html = ""
     for day in ml_predictions[:5]:
         precip_value = day.get('precipitation', 0)
@@ -2328,7 +2362,6 @@ async def ml_dashboard(request: Request):
         </div>
         '''
     
-    # Status model
     if model_info['is_trained']:
         model_status = f'''
         <div class="glass-card">
@@ -2378,7 +2411,6 @@ async def ml_dashboard(request: Request):
         </div>
         '''
     
-    # Timezone display
     tz_display = selected_location.get("timezone", "Asia/Jakarta").split('/')[-1].replace('_', ' ')
     if tz_display == "Jakarta":
         tz_display = "WIB"
@@ -2471,7 +2503,6 @@ async def delete_location_route(location_id: int):
 async def train_model_route(request: Request):
     global selected_location
     
-    # Check if AJAX request
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     
     try:
@@ -2514,6 +2545,11 @@ async def search_page(request: Request, message: str = None, type: str = None):
                 <button type="submit" class="search-btn"><i class="fas fa-search"></i> Cari & Simpan</button>
             </div>
         </form>
+        <div style="margin-top: 24px; text-align: center;">
+            <button onclick="detectLocation()" class="gps-btn" id="gpsDetectBtn">
+                <i class="fas fa-map-marker-alt"></i> Deteksi Lokasi Saya
+            </button>
+        </div>
         <p style="margin-top: 20px; font-size: 12px; color: var(--text-tertiary); text-align: center;">
             <i class="fas fa-globe"></i> Mendukung semua kota di seluruh dunia dengan zona waktu otomatis
         </p>
@@ -2541,6 +2577,5 @@ async def search_city_post(city_name: str = Form(...)):
         return RedirectResponse(url=f"/search?message=Kota '{city_name}' tidak ditemukan. Periksa ejaan Anda.&type=error", status_code=303)
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 8001))
     uvicorn.run(app, host="0.0.0.0", port=port)
