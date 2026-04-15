@@ -126,33 +126,22 @@ init_db()
 # ============ REVERSE GEOCODING ============
 def reverse_geocode(latitude: float, longitude: float):
     """Dapatkan nama kota dari koordinat GPS"""
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "current": ["temperature_2m"],
-        "timezone": "auto"
-    }
     try:
-        response = requests.get(url, params=params, timeout=30)
-        data = response.json()
-        timezone = data.get("timezone", "auto")
-        
-        # Gunakan API geocoding terbalik
         geo_url = f"https://nominatim.openstreetmap.org/reverse?lat={latitude}&lon={longitude}&format=json"
-        geo_response = requests.get(geo_url, headers={"User-Agent": "WeatherAI/1.0"}, timeout=30)
+        geo_response = requests.get(geo_url, headers={"User-Agent": "WeatherAI/1.0"}, timeout=10)
         geo_data = geo_response.json()
         
         if geo_data and 'address' in geo_data:
             city = geo_data['address'].get('city') or geo_data['address'].get('town') or geo_data['address'].get('village') or geo_data['address'].get('state') or "Unknown"
             country = geo_data['address'].get('country', "")
-            return city, country, timezone
+            return city, country
     except Exception as e:
         print(f"Reverse geocode error: {e}")
     
-    return None, None, None
+    return None, None
 
 def get_timezone_from_coords(latitude: float, longitude: float):
+    """Deteksi zona waktu berdasarkan koordinat (tanpa library eksternal)"""
     # Zona waktu Indonesia
     if 95 <= longitude <= 141:
         if -8 <= latitude <= 6:
@@ -163,6 +152,7 @@ def get_timezone_from_coords(latitude: float, longitude: float):
             else:
                 return "Asia/Jayapura"
     
+    # Zona waktu dunia berdasarkan longitude
     offset = int((longitude + 7.5) / 15)
     offset = max(-12, min(12, offset))
     
@@ -695,7 +685,7 @@ Tulis dalam bahasa Indonesia yang natural, seperti gaya meteorolog. Jangan gunak
         print(f"❌ Gemini API error: {e}")
         return get_ai_insights_fallback(weather, forecast, location_name)
 
-# ============ CSS STYLES WITH ANIMATIONS ==========
+# ============ CSS STYLES (DIPERCEPAT UNTUK MOBILE) ==========
 CSS_STYLES = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap');
 
@@ -756,7 +746,7 @@ body {
     overflow-x: hidden;
 }
 
-/* ============ GPS BUTTON STYLES ============ */
+/* GPS Button */
 .gps-btn {
     background: var(--accent-gradient);
     border: none;
@@ -778,16 +768,7 @@ body {
     box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
 }
 
-.gps-btn.loading {
-    pointer-events: none;
-    opacity: 0.7;
-}
-
-.gps-btn i {
-    font-size: 14px;
-}
-
-/* ============ LOCATION TOAST ============ */
+/* Location Toast */
 .location-toast {
     position: fixed;
     bottom: 100px;
@@ -812,12 +793,7 @@ body {
     transform: translateX(-50%) translateY(0);
 }
 
-.location-toast i {
-    color: var(--accent);
-    font-size: 18px;
-}
-
-/* ============ LOADING STATES ============ */
+/* Loader */
 .loader-wrapper {
     position: fixed;
     top: 0;
@@ -837,10 +813,6 @@ body {
     visibility: hidden;
 }
 
-.loader {
-    text-align: center;
-}
-
 .cloud-loader {
     font-size: 80px;
     color: var(--accent);
@@ -852,17 +824,7 @@ body {
     50% { transform: translateY(-20px); }
 }
 
-.loader-text {
-    margin-top: 20px;
-    font-size: 18px;
-    font-weight: 600;
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-
-/* ============ RESPONSIVE GRID ============ */
+/* App Layout */
 .app {
     display: flex;
     min-height: 100vh;
@@ -884,20 +846,16 @@ body {
     overflow-y: auto;
 }
 
-/* Mobile sidebar */
 @media (max-width: 768px) {
     .sidebar {
         position: fixed;
         left: -300px;
         z-index: 150;
-        transition: left 0.3s ease;
     }
-    
     .sidebar.open {
         left: 0;
         box-shadow: 4px 0 30px rgba(0,0,0,0.2);
     }
-    
     .main {
         padding: 20px 16px !important;
     }
@@ -909,135 +867,34 @@ body {
     overflow-x: hidden;
 }
 
-/* Responsive adjustments */
+/* Responsive Grids */
 @media (max-width: 1200px) {
-    .stats-grid {
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    
-    .forecast-grid {
-        gap: 12px;
-    }
-    
-    .forecast-item {
-        padding: 12px 8px;
-    }
+    .stats-grid { flex-wrap: wrap; justify-content: center; }
+    .forecast-grid { gap: 12px; }
 }
 
 @media (max-width: 768px) {
-    .hero-title {
-        font-size: 24px !important;
-        flex-wrap: wrap;
-    }
-    
-    .weather-hero {
-        padding: 20px !important;
-    }
-    
-    .weather-main {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .weather-temp {
-        font-size: 56px !important;
-    }
-    
-    .temp-unit {
-        font-size: 24px !important;
-    }
-    
-    .weather-icon {
-        font-size: 56px !important;
-    }
-    
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        width: 100%;
-    }
-    
-    .stat-card {
-        padding: 12px !important;
-        min-width: auto !important;
-    }
-    
-    .stat-value {
-        font-size: 18px !important;
-    }
-    
-    .forecast-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        gap: 10px;
-    }
-    
-    .bento-grid {
-        grid-template-columns: 1fr !important;
-        gap: 16px !important;
-    }
-    
-    .glass-card {
-        padding: 20px !important;
-    }
-    
-    .search-container {
-        flex-direction: column;
-        border-radius: 28px;
-        padding: 12px;
-    }
-    
-    .search-input {
-        width: 100%;
-        padding: 12px 16px;
-    }
-    
-    .search-btn {
-        width: 100%;
-        justify-content: center;
-    }
-    
-    .info-item {
-        flex-direction: column;
-        text-align: center;
-        gap: 8px;
-    }
-    
-    .info-icon {
-        font-size: 24px;
-    }
+    .hero-title { font-size: 24px !important; flex-wrap: wrap; }
+    .weather-hero { padding: 20px !important; }
+    .weather-main { flex-direction: column; text-align: center; }
+    .weather-temp { font-size: 56px !important; }
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; }
+    .stat-card { padding: 12px !important; min-width: auto !important; }
+    .forecast-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; }
+    .bento-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+    .glass-card { padding: 20px !important; }
+    .search-container { flex-direction: column; border-radius: 28px; padding: 12px; }
+    .search-input { width: 100%; padding: 12px 16px; }
+    .search-btn { width: 100%; justify-content: center; }
 }
 
 @media (max-width: 480px) {
-    .main {
-        padding: 16px 12px !important;
-    }
-    
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .forecast-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .hero-title {
-        font-size: 20px !important;
-    }
-    
-    .hero-subtitle {
-        font-size: 12px;
-    }
-    
-    .modal-content {
-        padding: 24px !important;
-        margin: 16px;
-    }
+    .stats-grid { grid-template-columns: 1fr; }
+    .forecast-grid { grid-template-columns: repeat(2, 1fr); }
+    .hero-title { font-size: 20px !important; }
 }
 
-/* ============ HOVER EFFECTS ============ */
+/* Cards & Components */
 .glass-card, .weather-hero, .stat-card, .forecast-item {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1047,11 +904,113 @@ body {
     box-shadow: var(--shadow-xl);
 }
 
-.stat-card:hover, .forecast-item:hover {
-    transform: translateY(-2px) scale(1.01);
+.weather-hero {
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border-radius: 36px;
+    padding: 36px 44px;
+    margin-bottom: 32px;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-lg);
 }
 
-/* ============ SIDEBAR STYLES ============ */
+.weather-temp {
+    font-size: 88px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-primary);
+}
+
+.stats-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background: var(--bg-tertiary);
+    border-radius: 28px;
+    padding: 18px 28px;
+    text-align: center;
+    min-width: 110px;
+    transition: var(--transition);
+    border: 1px solid transparent;
+}
+
+.forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+}
+
+@media (max-width: 768px) {
+    .forecast-grid {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
+}
+
+.forecast-item {
+    text-align: center;
+    padding: 18px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 24px;
+    transition: var(--transition);
+    border: 1px solid transparent;
+}
+
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px;
+    margin-bottom: 36px;
+}
+
+@media (max-width: 900px) {
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border-radius: 32px;
+    padding: 28px;
+    border: 1px solid var(--glass-border);
+    transition: var(--transition);
+    box-shadow: var(--shadow-md);
+}
+
+.ml-badge {
+    display: inline-block;
+    background: var(--ml-gradient);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 9px;
+    font-weight: 600;
+    color: white;
+    margin-top: 6px;
+}
+
+.train-btn {
+    background: var(--ml-gradient);
+    border: none;
+    border-radius: 50px;
+    padding: 14px 28px;
+    color: white;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-top: 16px;
+}
+
+.train-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+}
+
+/* Navigation */
 .sidebar-header {
     display: flex;
     align-items: center;
@@ -1103,11 +1062,6 @@ body {
     font-size: 14px;
 }
 
-.nav-item i {
-    width: 22px;
-    font-size: 16px;
-}
-
 .nav-item:hover {
     background: var(--accent-soft);
     color: var(--accent);
@@ -1120,394 +1074,7 @@ body {
     border-left: 3px solid var(--accent);
 }
 
-.sidebar-section {
-    margin-top: 36px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border-color);
-}
-
-.sidebar-section-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-tertiary);
-    margin-bottom: 18px;
-}
-
-.sidebar-locations {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.location-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 14px;
-    background: var(--bg-tertiary);
-    border-radius: 14px;
-    cursor: pointer;
-    transition: var(--transition);
-    border: 1px solid transparent;
-}
-
-.location-item:hover {
-    background: var(--accent-soft);
-    transform: translateX(6px);
-    border-color: var(--accent);
-}
-
-.location-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.location-info i {
-    font-size: 16px;
-    color: var(--accent);
-}
-
-.location-name {
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.location-country {
-    font-size: 10px;
-    color: var(--text-tertiary);
-}
-
-.delete-btn {
-    background: rgba(239, 68, 68, 0.1);
-    border: none;
-    color: var(--danger);
-    cursor: pointer;
-    font-size: 12px;
-    padding: 6px 10px;
-    border-radius: 10px;
-    transition: var(--transition);
-}
-
-.delete-btn:hover {
-    background: var(--danger);
-    color: white;
-}
-
-/* ============ WEATHER HERO ============ */
-.weather-hero {
-    background: var(--card-bg);
-    backdrop-filter: blur(12px);
-    border-radius: 36px;
-    padding: 36px 44px;
-    margin-bottom: 32px;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-lg);
-}
-
-.weather-main {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 28px;
-}
-
-.weather-info {
-    text-align: center;
-}
-
-.weather-icon {
-    font-size: 80px;
-    margin-bottom: 12px;
-}
-
-.weather-temp {
-    font-size: 88px;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--text-primary);
-}
-
-.temp-unit {
-    font-size: 36px;
-    font-weight: 500;
-    color: var(--text-tertiary);
-}
-
-.weather-condition {
-    font-size: 22px;
-    font-weight: 700;
-    margin-top: 12px;
-}
-
-.feels-like {
-    font-size: 14px;
-    color: var(--text-tertiary);
-    margin-top: 6px;
-}
-
-/* ============ STATS GRID ============ */
-.stats-grid {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-.stat-card {
-    background: var(--bg-tertiary);
-    border-radius: 28px;
-    padding: 18px 28px;
-    text-align: center;
-    min-width: 110px;
-    transition: var(--transition);
-    border: 1px solid transparent;
-}
-
-.stat-icon {
-    font-size: 32px;
-    margin-bottom: 10px;
-}
-
-.stat-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: var(--text-tertiary);
-    letter-spacing: 1.5px;
-}
-
-.stat-value {
-    font-size: 22px;
-    font-weight: 800;
-    margin-top: 6px;
-}
-
-/* ============ BENTO GRID ============ */
-.bento-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 28px;
-    margin-bottom: 36px;
-}
-
-@media (max-width: 900px) {
-    .bento-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.glass-card {
-    background: var(--card-bg);
-    backdrop-filter: blur(12px);
-    border-radius: 32px;
-    padding: 28px;
-    border: 1px solid var(--glass-border);
-    transition: var(--transition);
-    box-shadow: var(--shadow-md);
-}
-
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.card-title {
-    font-size: 13px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-tertiary);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-/* ============ FORECAST GRID ============ */
-.forecast-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 16px;
-}
-
-@media (max-width: 768px) {
-    .forecast-grid {
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    }
-}
-
-.forecast-item {
-    text-align: center;
-    padding: 18px 12px;
-    background: var(--bg-tertiary);
-    border-radius: 24px;
-    transition: var(--transition);
-    border: 1px solid transparent;
-}
-
-.forecast-day {
-    font-weight: 800;
-    font-size: 15px;
-}
-
-.forecast-date {
-    font-size: 10px;
-    color: var(--text-tertiary);
-    margin-top: 4px;
-}
-
-.forecast-icon {
-    font-size: 32px;
-    margin: 12px 0;
-}
-
-.forecast-temp {
-    font-size: 18px;
-    font-weight: 800;
-}
-
-.forecast-temp-min {
-    font-size: 12px;
-    color: var(--text-tertiary);
-}
-
-.forecast-precip {
-    font-size: 11px;
-    color: var(--text-tertiary);
-    margin-top: 6px;
-}
-
-/* ============ ML BADGE ============ */
-.ml-badge {
-    display: inline-block;
-    background: var(--ml-gradient);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 9px;
-    font-weight: 600;
-    color: white;
-    margin-top: 6px;
-}
-
-.train-btn {
-    background: var(--ml-gradient);
-    border: none;
-    border-radius: 50px;
-    padding: 14px 28px;
-    color: white;
-    font-weight: 700;
-    font-size: 14px;
-    cursor: pointer;
-    transition: var(--transition);
-    margin-top: 16px;
-}
-
-.train-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
-}
-
-/* ============ INSIGHTS ============ */
-.insights-text {
-    line-height: 1.8;
-    font-size: 15px;
-    color: var(--text-primary);
-}
-
-/* ============ INFO ROW ============ */
-.info-row {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.info-item {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px;
-    background: var(--bg-tertiary);
-    border-radius: 24px;
-    transition: var(--transition);
-}
-
-.info-item:hover {
-    background: var(--accent-soft);
-    transform: translateX(6px);
-}
-
-.info-icon {
-    font-size: 26px;
-    color: var(--accent);
-}
-
-.info-label {
-    font-size: 11px;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-}
-
-.info-value {
-    font-size: 17px;
-    font-weight: 700;
-    margin-top: 3px;
-}
-
-.timezone-badge {
-    display: inline-block;
-    background: var(--accent-soft);
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--accent);
-    margin-top: 6px;
-}
-
-/* ============ FLASH MESSAGES ============ */
-.flash {
-    padding: 16px 24px;
-    border-radius: 32px;
-    margin-bottom: 28px;
-    text-align: center;
-    font-size: 14px;
-    font-weight: 600;
-    animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.flash-success {
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid var(--success);
-    color: var(--success);
-}
-
-.flash-error {
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid var(--danger);
-    color: var(--danger);
-}
-
-/* ============ THEME TOGGLE ============ */
+/* Theme Toggle */
 .theme-toggle {
     position: fixed;
     bottom: 28px;
@@ -1562,7 +1129,35 @@ body {
     color: white;
 }
 
-/* ============ FOOTER ============ */
+/* Flash Messages */
+.flash {
+    padding: 16px 24px;
+    border-radius: 32px;
+    margin-bottom: 28px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.flash-success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid var(--success);
+    color: var(--success);
+}
+
+.flash-error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+/* Footer */
 .footer {
     text-align: center;
     padding: 28px;
@@ -1572,110 +1167,7 @@ body {
     margin-top: 40px;
 }
 
-/* ============ SCROLLBAR ============ */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--bg-tertiary);
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--accent);
-    border-radius: 10px;
-}
-
-/* ============ MODAL ============ */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    z-index: 10000;
-    justify-content: center;
-    align-items: center;
-    animation: modalFadeIn 0.3s ease;
-}
-
-.modal.active {
-    display: flex;
-}
-
-.modal-content {
-    background: var(--card-bg);
-    backdrop-filter: blur(20px);
-    border-radius: 32px;
-    padding: 40px;
-    text-align: center;
-    max-width: 400px;
-    width: 90%;
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-xl);
-    animation: modalPop 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
-}
-
-@keyframes modalPop {
-    from {
-        opacity: 0;
-        transform: scale(0.8);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-.modal-icon {
-    font-size: 64px;
-    margin-bottom: 20px;
-    animation: spin 2s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.modal-title {
-    font-size: 24px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    background: var(--ml-gradient);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 6px;
-    background: var(--bg-tertiary);
-    border-radius: 3px;
-    overflow: hidden;
-    margin: 20px 0;
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--ml-gradient);
-    width: 0%;
-    border-radius: 3px;
-    animation: progressPulse 1s ease infinite;
-}
-
-@keyframes progressPulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
-}
-
-/* ============ AURA BACKGROUND ============ */
+/* Aura Background */
 .aura-bg {
     position: fixed;
     top: 0;
@@ -1698,6 +1190,76 @@ body {
 @keyframes auraPulse {
     0%, 100% { opacity: 0.6; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.02); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 10px;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: 32px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-xl);
+}
+
+@media (max-width: 480px) {
+    .modal-content {
+        padding: 24px !important;
+        margin: 16px;
+    }
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--ml-gradient);
+    width: 0%;
+    border-radius: 3px;
 }
 """
 
@@ -1753,10 +1315,8 @@ def render_page(content: str, active: str = "home", message: str = None, message
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
     <meta name="theme-color" content="#0f172a">
-    <meta name="description" content="WeatherAI - Aplikasi Prediksi Cuaca Cerdas Berbasis AI dengan akurasi tinggi. Informasi cuaca real-time, prakiraan 5 hari, dan analisis AI.">
-    <meta name="keywords" content="cuaca, prediksi cuaca, weather, AI, weather forecast, Indonesia, gemini AI, machine learning">
-    <meta name="author" content="WeatherAI">
-    <title>WeatherAI | Aura Dashboard - Prediksi Cuaca AI</title>
+    <meta name="description" content="WeatherAI - Aplikasi Prediksi Cuaca Cerdas Berbasis AI">
+    <title>WeatherAI | Aura Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -1764,42 +1324,29 @@ def render_page(content: str, active: str = "home", message: str = None, message
     {location_data}
 </head>
 <body>
-    <!-- LOADING SCREEN -->
     <div class="loader-wrapper" id="loaderWrapper">
         <div class="loader">
-            <div class="cloud-loader">
-                <i class="fas fa-cloud-sun"></i>
-            </div>
-            <div class="loader-text">
-                WeatherAI<span class="loader-dots"></span>
-            </div>
+            <div class="cloud-loader"><i class="fas fa-cloud-sun"></i></div>
+            <div class="loader-text">WeatherAI<span class="loader-dots"></span></div>
         </div>
     </div>
 
-    <!-- LOCATION TOAST -->
     <div class="location-toast" id="locationToast">
         <i class="fas fa-map-marker-alt"></i>
         <span id="toastMessage">Mendeteksi lokasi Anda...</span>
     </div>
 
-    <!-- TRAINING MODAL -->
     <div class="modal" id="trainingModal">
         <div class="modal-content">
-            <div class="modal-icon">
-                <i class="fas fa-brain"></i>
-            </div>
+            <div class="modal-icon"><i class="fas fa-brain"></i></div>
             <h3 class="modal-title">Melatih Model ML</h3>
             <p class="modal-message">Sedang melatih Random Forest Regressor dengan data historis...</p>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
             <p class="modal-message" style="font-size: 12px;" id="trainingStatus">Mengambil data cuaca...</p>
         </div>
     </div>
     
-    <div class="aura-bg">
-        <div class="aura-glow"></div>
-    </div>
+    <div class="aura-bg"><div class="aura-glow"></div></div>
     
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle theme">
         <i class="fas fa-moon" id="themeIcon"></i>
@@ -1812,36 +1359,25 @@ def render_page(content: str, active: str = "home", message: str = None, message
     <div class="app">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-logo-icon">
-                    <i class="fas fa-cloud-sun"></i>
-                </div>
-                <div>
-                    <div class="sidebar-logo-text">WeatherAI</div>
-                </div>
+                <div class="sidebar-logo-icon"><i class="fas fa-cloud-sun"></i></div>
+                <div><div class="sidebar-logo-text">WeatherAI</div></div>
             </div>
             
             <nav class="sidebar-nav">
                 <a href="/" class="nav-item {active_home}" data-page="home">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Dashboard</span>
+                    <i class="fas fa-chart-line"></i><span>Dashboard</span>
                 </a>
                 <a href="/ml-dashboard" class="nav-item {active_ml}" data-page="ml">
-                    <i class="fas fa-brain"></i>
-                    <span>ML Dashboard</span>
+                    <i class="fas fa-brain"></i><span>ML Dashboard</span>
                 </a>
                 <a href="/search" class="nav-item {active_search}" data-page="search">
-                    <i class="fas fa-search"></i>
-                    <span>Cari Kota</span>
+                    <i class="fas fa-search"></i><span>Cari Kota</span>
                 </a>
             </nav>
             
             <div class="sidebar-section">
-                <div class="sidebar-section-title">
-                    <i class="fas fa-star"></i> Lokasi Tersimpan
-                </div>
-                <div class="sidebar-locations">
-                    {sidebar_locations_html}
-                </div>
+                <div class="sidebar-section-title"><i class="fas fa-star"></i> Lokasi Tersimpan</div>
+                <div class="sidebar-locations">{sidebar_locations_html}</div>
                 <a href="/search" style="display: block; margin-top: 20px; text-align: center; font-size: 13px; color: var(--accent); text-decoration: none; font-weight: 600;">
                     <i class="fas fa-plus-circle"></i> Tambah Lokasi
                 </a>
@@ -1852,32 +1388,27 @@ def render_page(content: str, active: str = "home", message: str = None, message
             {message_html}
             {content}
             <div class="footer">
-                <p><i class="fas fa-microchip"></i> Powered by AI (Google Gemini) & Open-Meteo | Akurasi MAE 0.46°C</p>
+                <p><i class="fas fa-microchip"></i> Powered by AI (Google Gemini) & Open-Meteo</p>
                 <p style="margin-top: 8px;">© 2026 WeatherAI · Aura Dashboard · Smart Weather Intelligence</p>
             </div>
         </main>
     </div>
     
     <script>
-        // HIDE LOADER
         window.addEventListener('load', function() {{
             setTimeout(function() {{
                 document.getElementById('loaderWrapper').classList.add('hide');
             }}, 500);
         }});
         
-        // GPS AUTO DETECTION
         let gpsDetected = false;
         
         function showToast(message, isError = false) {{
             const toast = document.getElementById('locationToast');
             const toastMessage = document.getElementById('toastMessage');
             toastMessage.innerHTML = message;
-            toast.style.background = isError ? 'rgba(239, 68, 68, 0.9)' : '';
             toast.classList.add('show');
-            setTimeout(() => {{
-                toast.classList.remove('show');
-            }}, 3000);
+            setTimeout(() => toast.classList.remove('show'), 3000);
         }}
         
         function detectLocation() {{
@@ -1898,12 +1429,10 @@ def render_page(content: str, active: str = "home", message: str = None, message
                     showToast('📍 Mendapatkan informasi kota...');
                     
                     try {{
-                        // Get city name from coordinates
                         const response = await fetch(`/api/reverse-geocode?lat=${{lat}}&lng=${{lng}}`);
                         const data = await response.json();
                         
                         if (data.success && data.city) {{
-                            // Save to database via API
                             const saveResponse = await fetch('/api/save-location', {{
                                 method: 'POST',
                                 headers: {{ 'Content-Type': 'application/json' }},
@@ -1921,21 +1450,12 @@ def render_page(content: str, active: str = "home", message: str = None, message
                             if (saveData.success) {{
                                 showToast(`✅ Lokasi terdeteksi: ${{data.city}}`);
                                 gpsDetected = true;
-                                // Reload page to show weather for detected location
-                                setTimeout(() => {{
-                                    window.location.href = '/';
-                                }}, 1500);
+                                setTimeout(() => window.location.href = '/', 1500);
                             }} else if (saveData.exists) {{
                                 showToast(`📍 Lokasi ${{data.city}} sudah tersimpan`);
                                 gpsDetected = true;
-                                setTimeout(() => {{
-                                    window.location.href = '/';
-                                }}, 1500);
-                            }} else {{
-                                showToast(`⚠️ Gagal menyimpan lokasi`, true);
+                                setTimeout(() => window.location.href = '/', 1500);
                             }}
-                        }} else {{
-                            showToast(`⚠️ Tidak dapat menentukan nama kota`, true);
                         }}
                     }} catch (error) {{
                         console.error('GPS error:', error);
@@ -1944,28 +1464,13 @@ def render_page(content: str, active: str = "home", message: str = None, message
                 }},
                 (error) => {{
                     let errorMessage = '❌ Gagal mendapatkan lokasi';
-                    switch(error.code) {{
-                        case error.PERMISSION_DENIED:
-                            errorMessage = '❌ Izin lokasi ditolak. Aktifkan GPS untuk deteksi otomatis.';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errorMessage = '❌ Informasi lokasi tidak tersedia';
-                            break;
-                        case error.TIMEOUT:
-                            errorMessage = '❌ Waktu deteksi lokasi habis';
-                            break;
-                    }}
+                    if (error.code === 1) errorMessage = '❌ Izin lokasi ditolak';
                     showToast(errorMessage, true);
                 }},
-                {{
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
-                }}
+                {{ enableHighAccuracy: true, timeout: 10000 }}
             );
         }}
         
-        // Auto detect on page load (only once)
         setTimeout(() => {{
             const hasLocation = window.currentLocation && window.currentLocation.name !== 'Jakarta';
             if (!hasLocation && !localStorage.getItem('gps_detected')) {{
@@ -1974,57 +1479,37 @@ def render_page(content: str, active: str = "home", message: str = None, message
             }}
         }}, 1000);
         
-        // PAGE TRANSITION
         document.querySelectorAll('.nav-item').forEach(link => {{
             link.addEventListener('click', function(e) {{
                 e.preventDefault();
                 const href = this.getAttribute('href');
-                
                 document.getElementById('mainContent').style.opacity = '0';
                 document.getElementById('mainContent').style.transform = 'translateY(20px)';
-                
-                setTimeout(() => {{
-                    window.location.href = href;
-                }}, 300);
+                setTimeout(() => window.location.href = href, 300);
             }});
         }});
         
-        // TRAINING MODAL
         function showTrainingModal() {{
             const modal = document.getElementById('trainingModal');
             modal.classList.add('active');
-            
             const progressFill = document.getElementById('progressFill');
             const statusText = document.getElementById('trainingStatus');
             let progress = 0;
-            
-            const statuses = [
-                'Mengambil data cuaca...',
-                'Memproses fitur...',
-                'Melatih Random Forest...',
-                'Mengevaluasi model...',
-                'Menyimpan model...'
-            ];
+            const statuses = ['Mengambil data cuaca...', 'Memproses fitur...', 'Melatih Random Forest...', 'Mengevaluasi model...', 'Menyimpan model...'];
             let statusIndex = 0;
-            
             const interval = setInterval(() => {{
                 progress += 2;
                 progressFill.style.width = progress + '%';
-                
                 if (progress % 20 === 0 && statusIndex < statuses.length - 1) {{
                     statusIndex++;
                     statusText.textContent = statuses[statusIndex];
                 }}
-                
-                if (progress >= 100) {{
-                    clearInterval(interval);
-                }}
+                if (progress >= 100) clearInterval(interval);
             }}, 100);
         }}
         
         function hideTrainingModal() {{
-            const modal = document.getElementById('trainingModal');
-            modal.classList.remove('active');
+            document.getElementById('trainingModal').classList.remove('active');
             document.getElementById('progressFill').style.width = '0%';
         }}
         
@@ -2032,28 +1517,19 @@ def render_page(content: str, active: str = "home", message: str = None, message
             form.addEventListener('submit', function(e) {{
                 e.preventDefault();
                 showTrainingModal();
-                
-                fetch('/train-model', {{
-                    method: 'GET',
-                    headers: {{
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }}
-                }}).then(response => {{
-                    setTimeout(() => {{
-                        hideTrainingModal();
-                        window.location.href = '/ml-dashboard?message=✅ Model ML berhasil dilatih!&type=success';
-                    }}, 500);
-                }}).catch(error => {{
-                    hideTrainingModal();
-                    window.location.href = '/ml-dashboard?message=❌ Gagal melatih model&type=error';
-                }});
+                fetch('/train-model', {{ method: 'GET', headers: {{ 'X-Requested-With': 'XMLHttpRequest' }} }})
+                    .then(() => {{
+                        setTimeout(() => {{
+                            hideTrainingModal();
+                            window.location.href = '/ml-dashboard?message=✅ Model ML berhasil dilatih!&type=success';
+                        }}, 500);
+                    }});
             }});
         }});
         
         function toggleTheme() {{
             const body = document.body;
             const icon = document.getElementById('themeIcon');
-            
             if (body.classList.contains('dark')) {{
                 body.classList.remove('dark');
                 icon.classList.remove('fa-sun');
@@ -2068,12 +1544,10 @@ def render_page(content: str, active: str = "home", message: str = None, message
         }}
         
         const savedTheme = localStorage.getItem('theme');
-        const themeIcon = document.getElementById('themeIcon');
-        
         if (savedTheme === 'dark') {{
             document.body.classList.add('dark');
-            themeIcon.classList.remove('fa-moon');
-            themeIcon.classList.add('fa-sun');
+            document.getElementById('themeIcon').classList.remove('fa-moon');
+            document.getElementById('themeIcon').classList.add('fa-sun');
         }}
         
         function toggleSidebar() {{
@@ -2083,45 +1557,28 @@ def render_page(content: str, active: str = "home", message: str = None, message
         document.addEventListener('click', function(event) {{
             const sidebar = document.getElementById('sidebar');
             const toggle = document.getElementById('menuToggle');
-            if (window.innerWidth <= 768) {{
-                if (!sidebar.contains(event.target) && !toggle.contains(event.target)) {{
-                    sidebar.classList.remove('open');
-                }}
+            if (window.innerWidth <= 768 && !sidebar.contains(event.target) && !toggle.contains(event.target)) {{
+                sidebar.classList.remove('open');
             }}
         }});
         
         function updateRealTimeClock() {{
             const clockElement = document.getElementById('realtime-clock');
             const tzElement = document.getElementById('timezone-display');
-            
             if (clockElement && window.currentLocation) {{
                 try {{
-                    const options = {{
-                        timeZone: window.currentLocation.timezone,
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false
-                    }};
-                    const formatter = new Intl.DateTimeFormat('id-ID', options);
-                    const timeStr = formatter.format(new Date());
-                    clockElement.textContent = timeStr;
-                    
+                    const options = {{ timeZone: window.currentLocation.timezone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }};
+                    clockElement.textContent = new Intl.DateTimeFormat('id-ID', options).format(new Date());
                     if (tzElement && window.currentLocation.timezone) {{
                         let tzName = window.currentLocation.timezone.split('/').pop().replace('_', ' ');
                         if (tzName === 'Jakarta') tzName = 'WIB';
-                        else if (tzName === 'Makassar' || tzName === 'Ujung Pandang') tzName = 'WITA';
+                        else if (tzName === 'Makassar') tzName = 'WITA';
                         else if (tzName === 'Jayapura') tzName = 'WIT';
                         tzElement.textContent = tzName;
                     }}
                 }} catch(e) {{
-                    console.error('Timezone error:', e);
-                    const now = new Date();
-                    clockElement.textContent = now.toLocaleTimeString('id-ID');
+                    clockElement.textContent = new Date().toLocaleTimeString('id-ID');
                 }}
-            }} else if (clockElement) {{
-                const now = new Date();
-                clockElement.textContent = now.toLocaleTimeString('id-ID');
             }}
         }}
         
@@ -2130,10 +1587,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
         
         setTimeout(() => {{
             const flash = document.querySelector('.flash');
-            if (flash) {{
-                flash.style.opacity = '0';
-                setTimeout(() => flash.remove(), 500);
-            }}
+            if (flash) setTimeout(() => flash.remove(), 3000);
         }}, 3000);
     </script>
 </body>
@@ -2143,15 +1597,13 @@ def render_page(content: str, active: str = "home", message: str = None, message
 
 @app.get("/api/reverse-geocode")
 async def api_reverse_geocode(lat: float, lng: float):
-    """API untuk reverse geocoding dari koordinat GPS"""
-    city, country, timezone = reverse_geocode(lat, lng)
+    city, country = reverse_geocode(lat, lng)
     if city:
-        return {"success": True, "city": city, "country": country, "timezone": timezone or get_timezone_from_coords(lat, lng)}
+        return {"success": True, "city": city, "country": country or "", "timezone": get_timezone_from_coords(lat, lng)}
     return {"success": False, "error": "Could not determine location"}
 
 @app.post("/api/save-location")
 async def api_save_location(request: Request):
-    """API untuk menyimpan lokasi dari GPS"""
     data = await request.json()
     name = data.get("name")
     latitude = data.get("latitude")
@@ -2174,7 +1626,6 @@ selected_location = {
     "timezone": "Asia/Jakarta"
 }
 
-# ============ DASHBOARD UTAMA ============
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     global selected_location
@@ -2186,7 +1637,6 @@ async def home(request: Request):
     
     weather_icon = get_weather_icon_html(weather.get("weather_code", 0))
     condition_text = get_condition_text(weather.get("weather_code", 0))
-    
     local_info = get_local_time(selected_location["latitude"], selected_location["longitude"], selected_location.get("timezone"))
     
     hour = local_info["hour"]
@@ -2217,12 +1667,7 @@ async def home(request: Request):
         '''
     
     uv = weather.get("uv_index", 5)
-    if uv > 8:
-        uv_color = "#f97316"
-    elif uv > 6:
-        uv_color = "#f59e0b"
-    else:
-        uv_color = "#eab308"
+    uv_color = "#f97316" if uv > 8 else "#f59e0b" if uv > 6 else "#eab308"
     
     tz_display = selected_location.get("timezone", "Asia/Jakarta").split('/')[-1].replace('_', ' ')
     if tz_display == "Jakarta":
@@ -2234,10 +1679,7 @@ async def home(request: Request):
     
     content = f'''
     <div class="hero">
-        <h1 class="hero-title">
-            <span class="greeting-icon">{greeting_icon}</span> 
-            Halo, Selamat {greeting}!
-        </h1>
+        <h1 class="hero-title"><span class="greeting-icon">{greeting_icon}</span> Halo, Selamat {greeting}!</h1>
         <p class="hero-subtitle">Cuaca hari ini di {selected_location["name"]} untuk aktivitas Anda</p>
     </div>
     
@@ -2250,106 +1692,51 @@ async def home(request: Request):
                 <div class="feels-like">Terasa seperti {int(weather["feels_like"])}°C</div>
             </div>
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-tint" style="color: #38bdf8;"></i></div>
-                    <div class="stat-label">Kelembaban</div>
-                    <div class="stat-value">{int(weather["humidity"])}%</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-wind" style="color: #8b5cf6;"></i></div>
-                    <div class="stat-label">Angin</div>
-                    <div class="stat-value">{int(weather["wind_speed"])} km/j</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-cloud-rain" style="color: #60a5fa;"></i></div>
-                    <div class="stat-label">Hujan</div>
-                    <div class="stat-value">{weather["precipitation"]:.1f} mm</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-chart-line" style="color: #f59e0b;"></i></div>
-                    <div class="stat-label">Tekanan</div>
-                    <div class="stat-value">{int(weather["pressure"])} hPa</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-sun" style="color: {uv_color};"></i></div>
-                    <div class="stat-label">UV Index</div>
-                    <div class="stat-value">{uv:.1f}</div>
-                </div>
+                <div class="stat-card"><div class="stat-icon"><i class="fas fa-tint" style="color: #38bdf8;"></i></div><div class="stat-label">Kelembaban</div><div class="stat-value">{int(weather["humidity"])}%</div></div>
+                <div class="stat-card"><div class="stat-icon"><i class="fas fa-wind" style="color: #8b5cf6;"></i></div><div class="stat-label">Angin</div><div class="stat-value">{int(weather["wind_speed"])} km/j</div></div>
+                <div class="stat-card"><div class="stat-icon"><i class="fas fa-cloud-rain" style="color: #60a5fa;"></i></div><div class="stat-label">Hujan</div><div class="stat-value">{weather["precipitation"]:.1f} mm</div></div>
+                <div class="stat-card"><div class="stat-icon"><i class="fas fa-chart-line" style="color: #f59e0b;"></i></div><div class="stat-label">Tekanan</div><div class="stat-value">{int(weather["pressure"])} hPa</div></div>
+                <div class="stat-card"><div class="stat-icon"><i class="fas fa-sun" style="color: {uv_color};"></i></div><div class="stat-label">UV Index</div><div class="stat-value">{uv:.1f}</div></div>
             </div>
         </div>
     </div>
     
     <div class="bento-grid">
         <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-robot"></i> AI Weather Insights (Gemini)</span>
-                <i class="fas fa-microchip" style="color: var(--accent);"></i>
-            </div>
-            <div class="insights-text">
-                {insights}
-            </div>
+            <div class="card-header"><span class="card-title"><i class="fas fa-robot"></i> AI Weather Insights (Gemini)</span><i class="fas fa-microchip" style="color: var(--accent);"></i></div>
+            <div class="insights-text">{insights}</div>
         </div>
         
         <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-info-circle"></i> Informasi Cuaca</span>
-            </div>
+            <div class="card-header"><span class="card-title"><i class="fas fa-info-circle"></i> Informasi Cuaca</span></div>
             <div class="info-row">
-                <div class="info-item">
-                    <i class="fas fa-map-pin info-icon"></i>
-                    <div>
-                        <div class="info-label">LOKASI AKTIF</div>
-                        <div class="info-value">{selected_location["name"]}</div>
-                    </div>
-                </div>
-                <div class="info-item">
-                    <i class="fas fa-calendar-alt info-icon"></i>
-                    <div>
-                        <div class="info-label">TANGGAL</div>
-                        <div class="info-value">{local_info["date"]}</div>
-                    </div>
-                </div>
-                <div class="info-item">
-                    <i class="fas fa-clock info-icon"></i>
-                    <div>
-                        <div class="info-label">WAKTU LOKAL</div>
-                        <div class="info-value">
-                            <span id="realtime-clock">{local_info["time"]}</span>
-                            <div class="timezone-badge" id="timezone-display">{tz_display}</div>
-                        </div>
-                    </div>
-                </div>
+                <div class="info-item"><i class="fas fa-map-pin info-icon"></i><div><div class="info-label">LOKASI AKTIF</div><div class="info-value">{selected_location["name"]}</div></div></div>
+                <div class="info-item"><i class="fas fa-calendar-alt info-icon"></i><div><div class="info-label">TANGGAL</div><div class="info-value">{local_info["date"]}</div></div></div>
+                <div class="info-item"><i class="fas fa-clock info-icon"></i><div><div class="info-label">WAKTU LOKAL</div><div class="info-value"><span id="realtime-clock">{local_info["time"]}</span><div class="timezone-badge" id="timezone-display">{tz_display}</div></div></div></div>
             </div>
         </div>
     </div>
     
     <div class="glass-card">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-calendar-week"></i> Prakiraan 5 Hari (Open-Meteo API)</span>
-            <i class="fas fa-cloud-sun" style="color: var(--accent);"></i>
-        </div>
+        <div class="card-header"><span class="card-title"><i class="fas fa-calendar-week"></i> Prakiraan 5 Hari (Open-Meteo API)</span><i class="fas fa-cloud-sun" style="color: var(--accent);"></i></div>
         <div class="forecast-grid">{forecast_html}</div>
     </div>
     '''
     
     return HTMLResponse(content=render_page(content, active="home", saved_locations=saved_locations, selected_location=selected_location))
 
-# ============ ML DASHBOARD ============
 @app.get("/ml-dashboard", response_class=HTMLResponse)
 async def ml_dashboard(request: Request):
     global selected_location
     
     saved_locations = get_saved_locations()
     weather = get_current_weather(selected_location["latitude"], selected_location["longitude"])
-    
     ml_predictions = weather_predictor.predict_temperature(weather)
     model_info = weather_predictor.get_model_info()
-    
     local_info = get_local_time(selected_location["latitude"], selected_location["longitude"], selected_location.get("timezone"))
     
     ml_forecast_html = ""
     for day in ml_predictions[:5]:
-        precip_value = day.get('precipitation', 0)
         ml_forecast_html += f'''
         <div class="forecast-item">
             <div class="forecast-day">{day["day"]}</div>
@@ -2357,7 +1744,7 @@ async def ml_dashboard(request: Request):
             <div class="forecast-icon"><i class="fas fa-chart-line" style="color: #8b5cf6;"></i></div>
             <div class="forecast-temp">{int(day["temp_max"])}°</div>
             <div class="forecast-temp-min">{int(day["temp_min"])}°</div>
-            <div class="forecast-precip"><i class="fas fa-tint"></i> {precip_value}mm</div>
+            <div class="forecast-precip"><i class="fas fa-tint"></i> {day["precipitation"]}mm</div>
             <div class="ml-badge"><i class="fas fa-brain"></i> ML</div>
         </div>
         '''
@@ -2365,59 +1752,31 @@ async def ml_dashboard(request: Request):
     if model_info['is_trained']:
         model_status = f'''
         <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-chart-simple"></i> Metrik Model ML</span>
-                <i class="fas fa-brain" style="color: #8b5cf6;"></i>
-            </div>
+            <div class="card-header"><span class="card-title"><i class="fas fa-chart-simple"></i> Metrik Model ML</span><i class="fas fa-brain" style="color: #8b5cf6;"></i></div>
             <div class="stats-grid" style="margin-bottom: 0;">
-                <div class="stat-card" style="flex: 1;">
-                    <div class="stat-icon"><i class="fas fa-chart-line" style="color: #8b5cf6;"></i></div>
-                    <div class="stat-label">MAE (Mean Absolute Error)</div>
-                    <div class="stat-value" style="color: #8b5cf6;">{model_info['mae']:.6f}°C</div>
-                </div>
-                <div class="stat-card" style="flex: 1;">
-                    <div class="stat-icon"><i class="fas fa-chart-bar" style="color: #8b5cf6;"></i></div>
-                    <div class="stat-label">R² Score (Akurasi)</div>
-                    <div class="stat-value" style="color: #8b5cf6;">{model_info['r2']:.6f}</div>
-                </div>
-                <div class="stat-card" style="flex: 1;">
-                    <div class="stat-icon"><i class="fas fa-map-marker-alt" style="color: #8b5cf6;"></i></div>
-                    <div class="stat-label">Lokasi Training</div>
-                    <div class="stat-value" style="color: #8b5cf6; font-size: 16px;">{model_info['location']}</div>
-                </div>
+                <div class="stat-card" style="flex: 1;"><div class="stat-icon"><i class="fas fa-chart-line" style="color: #8b5cf6;"></i></div><div class="stat-label">MAE</div><div class="stat-value" style="color: #8b5cf6;">{model_info['mae']:.6f}°C</div></div>
+                <div class="stat-card" style="flex: 1;"><div class="stat-icon"><i class="fas fa-chart-bar" style="color: #8b5cf6;"></i></div><div class="stat-label">R² Score</div><div class="stat-value" style="color: #8b5cf6;">{model_info['r2']:.6f}</div></div>
+                <div class="stat-card" style="flex: 1;"><div class="stat-icon"><i class="fas fa-map-marker-alt" style="color: #8b5cf6;"></i></div><div class="stat-label">Lokasi Training</div><div class="stat-value" style="color: #8b5cf6; font-size: 16px;">{model_info['location']}</div></div>
             </div>
-            <form method="GET" action="/train-model" style="margin-top: 24px;" id="trainForm">
-                <button type="submit" class="train-btn" style="width: 100%;">
-                    <i class="fas fa-sync-alt"></i> Latih Ulang Model ML
-                </button>
-            </form>
+            <form method="GET" action="/train-model" style="margin-top: 24px;"><button type="submit" class="train-btn" style="width: 100%;"><i class="fas fa-sync-alt"></i> Latih Ulang Model ML</button></form>
         </div>
         '''
     else:
         model_status = f'''
         <div class="glass-card" style="text-align: center;">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-exclamation-triangle"></i> Model Belum Dilatih</span>
-            </div>
+            <div class="card-header"><span class="card-title"><i class="fas fa-exclamation-triangle"></i> Model Belum Dilatih</span></div>
             <div style="padding: 32px 0;">
                 <i class="fas fa-brain" style="font-size: 64px; color: var(--ml-purple); margin-bottom: 24px; display: block;"></i>
                 <p style="color: var(--text-tertiary); margin-bottom: 24px;">Klik tombol di bawah untuk melatih model Random Forest Regressor</p>
-                <form method="GET" action="/train-model" id="trainForm">
-                    <button type="submit" class="train-btn">
-                        <i class="fas fa-play"></i> Latih Model ML Sekarang
-                    </button>
-                </form>
+                <form method="GET" action="/train-model"><button type="submit" class="train-btn"><i class="fas fa-play"></i> Latih Model ML Sekarang</button></form>
             </div>
         </div>
         '''
     
     tz_display = selected_location.get("timezone", "Asia/Jakarta").split('/')[-1].replace('_', ' ')
-    if tz_display == "Jakarta":
-        tz_display = "WIB"
-    elif tz_display == "Makassar" or tz_display == "Ujung Pandang":
-        tz_display = "WITA"
-    elif tz_display == "Jayapura":
-        tz_display = "WIT"
+    if tz_display == "Jakarta": tz_display = "WIB"
+    elif tz_display == "Makassar": tz_display = "WITA"
+    elif tz_display == "Jayapura": tz_display = "WIT"
     
     content = f'''
     <div class="hero">
@@ -2426,44 +1785,18 @@ async def ml_dashboard(request: Request):
     </div>
     
     <div class="glass-card">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-chart-line"></i> Prediksi ML 5 Hari (Random Forest)</span>
-            <i class="fas fa-brain" style="color: #8b5cf6;"></i>
-        </div>
+        <div class="card-header"><span class="card-title"><i class="fas fa-chart-line"></i> Prediksi ML 5 Hari (Random Forest)</span><i class="fas fa-brain" style="color: #8b5cf6;"></i></div>
         <div class="forecast-grid">{ml_forecast_html}</div>
     </div>
     
     {model_status}
     
     <div class="glass-card">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-info-circle"></i> Informasi Lokasi</span>
-        </div>
+        <div class="card-header"><span class="card-title"><i class="fas fa-info-circle"></i> Informasi Lokasi</span></div>
         <div class="info-row">
-            <div class="info-item">
-                <i class="fas fa-map-pin info-icon"></i>
-                <div>
-                    <div class="info-label">LOKASI AKTIF</div>
-                    <div class="info-value">{selected_location["name"]}</div>
-                </div>
-            </div>
-            <div class="info-item">
-                <i class="fas fa-calendar-alt info-icon"></i>
-                <div>
-                    <div class="info-label">TANGGAL</div>
-                    <div class="info-value">{local_info["date"]}</div>
-                </div>
-            </div>
-            <div class="info-item">
-                <i class="fas fa-clock info-icon"></i>
-                <div>
-                    <div class="info-label">WAKTU LOKAL</div>
-                    <div class="info-value">
-                        <span id="realtime-clock">{local_info["time"]}</span>
-                        <div class="timezone-badge" id="timezone-display">{tz_display}</div>
-                    </div>
-                </div>
-            </div>
+            <div class="info-item"><i class="fas fa-map-pin info-icon"></i><div><div class="info-label">LOKASI AKTIF</div><div class="info-value">{selected_location["name"]}</div></div></div>
+            <div class="info-item"><i class="fas fa-calendar-alt info-icon"></i><div><div class="info-label">TANGGAL</div><div class="info-value">{local_info["date"]}</div></div></div>
+            <div class="info-item"><i class="fas fa-clock info-icon"></i><div><div class="info-label">WAKTU LOKAL</div><div class="info-value"><span id="realtime-clock">{local_info["time"]}</span><div class="timezone-badge" id="timezone-display">{tz_display}</div></div></div></div>
         </div>
     </div>
     '''
@@ -2536,9 +1869,7 @@ async def search_page(request: Request, message: str = None, type: str = None):
     </div>
     
     <div class="glass-card" style="max-width: 600px; margin: 0 auto;">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-search"></i> Pencarian Lokasi</span>
-        </div>
+        <div class="card-header"><span class="card-title"><i class="fas fa-search"></i> Pencarian Lokasi</span></div>
         <form method="POST" action="/search">
             <div class="search-container" style="margin-bottom: 0;">
                 <input type="text" name="city_name" class="search-input" placeholder="Masukkan nama kota... Jakarta, Bali, New York, London, Tokyo" required>
@@ -2546,9 +1877,7 @@ async def search_page(request: Request, message: str = None, type: str = None):
             </div>
         </form>
         <div style="margin-top: 24px; text-align: center;">
-            <button onclick="detectLocation()" class="gps-btn" id="gpsDetectBtn">
-                <i class="fas fa-map-marker-alt"></i> Deteksi Lokasi Saya
-            </button>
+            <button onclick="detectLocation()" class="gps-btn"><i class="fas fa-map-marker-alt"></i> Deteksi Lokasi Saya</button>
         </div>
         <p style="margin-top: 20px; font-size: 12px; color: var(--text-tertiary); text-align: center;">
             <i class="fas fa-globe"></i> Mendukung semua kota di seluruh dunia dengan zona waktu otomatis
