@@ -44,11 +44,11 @@ def initialize_gemini_client():
             client = genai.Client(api_key=api_key)
             # Test the client with a simple request
             test_response = client.models.generate_content(
-                model="gemini-2.0-flash-exp",
+                model="gemini-1.5-flash",
                 contents="Test connection"
             )
             print(f"✅ AI API (Google Gemini) siap digunakan dengan API Key {i}")
-            print("   Model: gemini-2.0-flash-exp")
+            print("   Model: gemini-1.5-flash")
             return client, True
         except Exception as e:
             print(f"⚠️ API Key {i} gagal: {e}")
@@ -733,7 +733,7 @@ Tulis dalam bahasa Indonesia yang natural, seperti gaya meteorolog. Jangan gunak
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         insights = response.text.strip()
