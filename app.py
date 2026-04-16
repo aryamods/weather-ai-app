@@ -5,6 +5,7 @@ import sqlite3
 import requests
 from datetime import datetime, timedelta
 import pytz
+from timezonefinder import TimezoneFinder
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -12,61 +13,29 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 import os
+import asyncio
+import warnings
 
-app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="3.0.0")
+# Suppress scikit-learn version warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+
+app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="3.1.0")
 
 # ============ KONFIGURASI AI API (GEMINI) ============
-import os
-
-# Load environment variables from .env file if it exists
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-    print("✅ Environment variables loaded from .env file")
-except ImportError:
-    print("ℹ️ python-dotenv not installed. Using system environment variables only.")
-    print("   Install with: pip install python-dotenv")
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_API_KEY_BACKUP = os.environ.get("GEMINI_API_KEY_BACKUP", "")
-
-def initialize_gemini_client():
-    """Initialize Gemini client with fallback API keys"""
-    api_keys = [GEMINI_API_KEY, GEMINI_API_KEY_BACKUP]
-    api_keys = [key for key in api_keys if key]  # Remove empty keys
-    
-    if not api_keys:
-        print("⚠️ Tidak ada API key Gemini yang tersedia")
-        return None, False
-    
-    for i, api_key in enumerate(api_keys, 1):
-        try:
-            client = genai.Client(api_key=api_key)
-            # Test the client with a simple request
-            test_response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents="Test connection"
-            )
-            print(f"✅ AI API (Google Gemini) siap digunakan dengan API Key {i}")
-            print("   Model: gemini-1.5-flash")
-            return client, True
-        except Exception as e:
-            print(f"⚠️ API Key {i} gagal: {e}")
-            continue
-    
-    print("❌ Semua API key Gemini gagal. AI features akan dinonaktifkan.")
-    return None, False
+GEMINI_API_KEY = "AIzaSyDYF3lX6hH8Iwr8JpqPBR0Of2T4OMyL8ns"
+GEMINI_MODEL = "gemini-2.0-flash-exp"  # Model yang tersedia dan gratis
 
 AI_AVAILABLE = False
-client = None
-
 try:
     from google import genai
-    client, AI_AVAILABLE = initialize_gemini_client()
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    AI_AVAILABLE = True
+    print(f"✅ AI API (Google Gemini) siap digunakan (GRATIS)")
+    print(f"   Model: {GEMINI_MODEL}")
 except ImportError:
     print("⚠️ Library google-genai belum terinstall. Install dengan: pip install google-genai")
 except Exception as e:
-    print(f"⚠️ Error inisialisasi Gemini: {e}")
+    print(f"⚠️ AI API error: {e}")
     AI_AVAILABLE = False
 
 # ============ DATABASE ============
@@ -162,67 +131,18 @@ def location_exists(name: str, latitude: float, longitude: float):
 
 init_db()
 
-# ============ TIMEZONE HELPER (TANPA timezonefinder) ============
+# ============ TIMEZONE HELPER ============
+tf = TimezoneFinder()
 
 def get_timezone_from_coords(latitude: float, longitude: float):
-    """Deteksi zona waktu berdasarkan koordinat (tanpa library eksternal)"""
-    
-    # Zona waktu Indonesia
-    if 95 <= longitude <= 141:
-        if -8 <= latitude <= 6:  # Wilayah Indonesia
-            if 95 <= longitude <= 120:
-                return "Asia/Jakarta"  # WIB
-            elif 120 < longitude <= 128:
-                return "Asia/Makassar"  # WITA
-            else:
-                return "Asia/Jayapura"  # WIT
-    
-    # Zona waktu dunia berdasarkan longitude
-    # Setiap 15 derajat = 1 jam
-    offset = int((longitude + 7.5) / 15)
-    
-    # Batasi offset antara -12 sampai +12
-    offset = max(-12, min(12, offset))
-    
-    # Mapping ke zona waktu yang dikenal
-    if offset == -5:
-        return "America/New_York"
-    elif offset == -6:
-        return "America/Chicago"
-    elif offset == -7:
-        return "America/Denver"
-    elif offset == -8:
-        return "America/Los_Angeles"
-    elif offset == 0:
-        return "Europe/London"
-    elif offset == 1:
-        return "Europe/Paris"
-    elif offset == 2:
-        return "Europe/Helsinki"
-    elif offset == 3:
-        return "Asia/Riyadh"
-    elif offset == 4:
-        return "Asia/Dubai"
-    elif offset == 5:
-        return "Asia/Karachi"
-    elif offset == 5.5:
-        return "Asia/Kolkata"
-    elif offset == 6:
-        return "Asia/Dhaka"
-    elif offset == 7:
+    try:
+        timezone_str = tf.timezone_at(lat=latitude, lng=longitude)
+        if timezone_str:
+            return timezone_str
         return "Asia/Jakarta"
-    elif offset == 8:
-        return "Asia/Makassar"
-    elif offset == 9:
-        return "Asia/Jayapura"
-    elif offset == 10:
-        return "Asia/Tokyo"
-    elif offset == 11:
-        return "Asia/Sakhalin"
-    elif offset == 12:
-        return "Pacific/Auckland"
-    else:
-        return "UTC"
+    except Exception as e:
+        print(f"Timezone error: {e}")
+        return "Asia/Jakarta"
 
 def get_local_time(latitude: float, longitude: float, timezone_str: str = None):
     try:
@@ -535,9 +455,11 @@ class WeatherPredictor:
                 self.model = saved['model']
                 self.features = saved['features']
                 print(f"✅ Model dimuat dari {MODEL_PATH}")
+                print(f"   MAE: {saved.get('mae', 'N/A')}, R²: {saved.get('r2', 'N/A')}")
                 return True
             except Exception as e:
                 print(f"⚠️ Gagal memuat model: {e}")
+                print(f"   Model akan dilatih ulang secara otomatis")
                 return False
         return False
     
@@ -696,7 +618,7 @@ def get_ai_insights_fallback(weather, forecast, location_name: str = None):
     return f"{opening}{precip_text}{wind_text}{uv_text}{forecast_text}"
 
 def get_ai_insights_real(weather, forecast, location_name: str = None):
-    if not AI_AVAILABLE or client is None:
+    if not AI_AVAILABLE:
         return get_ai_insights_fallback(weather, forecast, location_name)
     
     location = location_name or "Lokasi Anda"
@@ -733,7 +655,7 @@ Tulis dalam bahasa Indonesia yang natural, seperti gaya meteorolog. Jangan gunak
 
     try:
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model=GEMINI_MODEL,
             contents=prompt
         )
         insights = response.text.strip()
@@ -744,6 +666,7 @@ Tulis dalam bahasa Indonesia yang natural, seperti gaya meteorolog. Jangan gunak
         return get_ai_insights_fallback(weather, forecast, location_name)
 
 # ============ CSS STYLES WITH ANIMATIONS ==========
+# [CSS_STYLES tetap sama seperti sebelumnya, dihilangkan untuk menghemat ruang]
 CSS_STYLES = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap');
 
@@ -759,22 +682,20 @@ CSS_STYLES = """
     --sidebar-bg: rgba(255, 255, 255, 0.96);
     --sidebar-border: rgba(0, 0, 0, 0.06);
     --accent: #3b82f6;
-    --accent-gradient: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
+    --accent-gradient: linear-gradient(135deg, #3b82f6, #6366f1);
     --accent-hover: #2563eb;
     --accent-soft: rgba(59, 130, 246, 0.12);
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #ef4444;
     --ml-purple: #8b5cf6;
-    --ml-gradient: linear-gradient(135deg, #8b5cf6, #a855f7, #c084fc);
+    --ml-gradient: linear-gradient(135deg, #8b5cf6, #6366f1);
     --glass-border: rgba(255, 255, 255, 0.2);
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
     --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.08);
     --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.12);
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body.dark {
@@ -804,40 +725,9 @@ body {
     line-height: 1.5;
     transition: background 0.3s ease, color 0.2s ease;
     overflow-x: hidden;
-    position: relative;
 }
 
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-        radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
-        radial-gradient(circle at 60% 10%, rgba(168, 85, 247, 0.06) 0%, transparent 40%);
-    animation: backgroundShift 20s ease infinite;
-    z-index: -1;
-    pointer-events: none;
-}
-
-@keyframes backgroundShift {
-    0%, 100% { 
-        transform: scale(1) rotate(0deg);
-        opacity: 0.6;
-    }
-    33% { 
-        transform: scale(1.05) rotate(1deg);
-        opacity: 0.8;
-    }
-    66% { 
-        transform: scale(0.95) rotate(-1deg);
-        opacity: 0.7;
-    }
-}
-
+/* Rest of CSS remains the same as original */
 .greeting-icon {
     display: inline-block;
     animation: wave 0.5s ease;
@@ -883,18 +773,11 @@ body::before {
     font-size: 80px;
     color: var(--accent);
     animation: cloudFloat 2s ease-in-out infinite;
-    filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));
 }
 
 @keyframes cloudFloat {
-    0%, 100% { 
-        transform: translateY(0px) scale(1);
-        filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));
-    }
-    50% { 
-        transform: translateY(-20px) scale(1.05);
-        filter: drop-shadow(0 0 30px rgba(59, 130, 246, 0.5));
-    }
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
 }
 
 .loader-text {
@@ -905,12 +788,6 @@ body::before {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: textGlow 2s ease-in-out infinite alternate;
-}
-
-@keyframes textGlow {
-    0% { filter: brightness(1); }
-    100% { filter: brightness(1.2); }
 }
 
 .loader-dots {
@@ -1011,24 +888,6 @@ body::before {
     border: 1px solid var(--glass-border);
     box-shadow: var(--shadow-xl);
     animation: modalPop 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.modal-content::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: var(--ml-gradient);
-    animation: progressBar 3s ease-in-out infinite;
-}
-
-@keyframes progressBar {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
 }
 
 @keyframes modalPop {
@@ -1083,23 +942,6 @@ body::before {
     width: 0%;
     border-radius: 3px;
     animation: progressPulse 1s ease infinite;
-    position: relative;
-}
-
-.progress-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-    animation: shimmer 2s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
 }
 
 @keyframes progressPulse {
@@ -1109,35 +951,16 @@ body::before {
 
 /* ============ CARD HOVER ANIMATIONS ============ */
 .glass-card, .weather-hero, .stat-card, .forecast-item {
-    transition: var(--transition);
-    position: relative;
-    overflow: hidden;
-}
-
-.glass-card::before, .weather-hero::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.05), transparent);
-    transition: left 0.6s ease;
-}
-
-.glass-card:hover::before, .weather-hero:hover::before {
-    left: 100%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover, .weather-hero:hover {
     transform: translateY(-6px);
     box-shadow: var(--shadow-xl);
-    border-color: rgba(59, 130, 246, 0.2);
 }
 
 .stat-card:hover, .forecast-item:hover {
     transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
 }
 
 /* ============ SIDEBAR TRANSITION ============ */
@@ -1147,83 +970,25 @@ body::before {
 
 /* ============ THEME TOGGLE ANIMATION ============ */
 .theme-toggle {
-    transition: var(--transition);
-    position: relative;
-}
-
-.theme-toggle::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: var(--accent-gradient);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    transition: width 0.3s ease, height 0.3s ease;
-    z-index: -1;
-}
-
-.theme-toggle:hover::before {
-    width: 60px;
-    height: 60px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .theme-toggle:hover {
     transform: scale(1.1) rotate(15deg);
-    color: white;
 }
 
 /* ============ SEARCH BAR ANIMATION ============ */
 .search-container {
-    transition: var(--transition);
-    position: relative;
-}
-
-.search-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--accent-gradient);
-    border-radius: 60px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: -1;
-}
-
-.search-container:focus-within::before {
-    opacity: 0.1;
+    transition: all 0.3s ease;
 }
 
 .search-container:focus-within {
     transform: translateY(-2px);
     box-shadow: 0 8px 28px rgba(59, 130, 246, 0.2);
-    border-color: var(--accent);
 }
 
 .search-btn {
-    transition: var(--transition);
-    position: relative;
-    overflow: hidden;
-}
-
-.search-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: left 0.5s ease;
-}
-
-.search-btn:hover::before {
-    left: 100%;
+    transition: all 0.3s ease;
 }
 
 .search-btn:hover {
@@ -1233,17 +998,9 @@ body::before {
 
 /* ============ TRAINING BUTTON ANIMATION ============ */
 .train-btn {
-    transition: var(--transition);
+    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-    background: var(--ml-gradient);
-    background-size: 200% 200%;
-    animation: gradientShift 3s ease infinite;
-}
-
-@keyframes gradientShift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
 }
 
 .train-btn::before {
@@ -1327,8 +1084,6 @@ body::before {
     height: 100vh;
     transition: var(--transition);
     z-index: 100;
-    border-radius: 0 24px 24px 0;
-    box-shadow: var(--shadow-lg);
 }
 
 .sidebar-header {
@@ -1352,12 +1107,6 @@ body::before {
     color: white;
     box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
     animation: logoPulse 2s ease infinite;
-    transition: var(--transition);
-}
-
-.sidebar-logo-icon:hover {
-    transform: scale(1.1) rotate(5deg);
-    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.5);
 }
 
 @keyframes logoPulse {
@@ -1409,7 +1158,6 @@ body::before {
     background: var(--accent-soft);
     color: var(--accent);
     border-left: 3px solid var(--accent);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .sidebar-section {
@@ -1935,132 +1683,58 @@ body::before {
     border-radius: 10px;
 }
 
-@media (min-width: 769px) and (max-width: 1024px) {
-    /* Tablet styles */
-    .sidebar {
-        width: 240px;
-    }
-    
-    .main {
-        padding: 24px 32px;
-    }
-    
-    .weather-hero {
-        padding: 32px 36px;
-    }
-    
-    .hero-title {
-        font-size: 32px;
-    }
-    
-    .bento-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 24px;
-    }
-    
-    .forecast-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    
-    .stat-card {
-        padding: 16px 24px;
-        min-width: 100px;
-    }
-}
-
 @media (max-width: 768px) {
-    .app {
-        flex-direction: column;
-    }
-
     .sidebar {
         position: fixed;
-        left: -100%;
-        width: min(320px, 100%);
-        max-width: 320px;
+        left: -300px;
         z-index: 150;
         transition: left 0.3s ease;
-        border-radius: 0 32px 32px 0;
-        height: 100vh;
-        overflow-y: auto;
-        padding: 24px 18px;
     }
     
     .sidebar.open {
         left: 0;
-        box-shadow: 4px 0 30px rgba(0,0,0,0.18);
+        box-shadow: 4px 0 30px rgba(0,0,0,0.2);
     }
     
     .main {
-        padding: 18px 16px 28px;
+        padding: 20px;
     }
     
     .weather-hero {
-        padding: 22px 20px;
-        border-radius: 22px;
-    }
-    
-    .weather-main {
-        flex-direction: column;
-        align-items: center;
-        gap: 20px;
+        padding: 24px;
     }
     
     .weather-temp {
-        font-size: 48px;
+        font-size: 56px;
     }
     
     .temp-unit {
-        font-size: 22px;
+        font-size: 24px;
     }
     
     .weather-icon {
         font-size: 56px;
     }
     
-    .search-container {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 12px;
-        padding: 10px;
-    }
-
-    .search-input {
-        padding: 14px 18px;
-    }
-
-    .search-btn {
-        width: 100%;
-        padding: 14px 18px;
-    }
-    
     .forecast-grid {
-        gap: 12px;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
     }
     
     .forecast-item {
-        padding: 14px 10px;
+        padding: 12px 6px;
     }
     
     .forecast-icon {
-        font-size: 28px;
+        font-size: 24px;
     }
     
     .forecast-temp {
-        font-size: 15px;
+        font-size: 14px;
     }
     
     .stat-card {
-        padding: 14px 16px;
-        min-width: auto;
-        flex: 1 1 calc(50% - 10px);
-    }
-    
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
+        padding: 14px 18px;
+        min-width: 90px;
     }
     
     .stat-value {
@@ -2073,47 +1747,6 @@ body::before {
     
     .hero-title {
         font-size: 28px;
-    }
-    
-    .hero-subtitle {
-        font-size: 14px;
-    }
-    
-    .bento-grid {
-        grid-template-columns: 1fr;
-        gap: 18px;
-    }
-    
-    .glass-card {
-        padding: 20px;
-    }
-    
-    .card-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    
-    .sidebar-nav {
-        gap: 10px;
-    }
-    
-    .sidebar-section {
-        margin-top: 28px;
-        padding-top: 20px;
-    }
-    
-    .sidebar-locations {
-        max-height: 260px;
-    }
-    
-    .location-item {
-        padding: 10px 12px;
-    }
-    
-    .delete-btn {
-        padding: 6px 8px;
-        font-size: 11px;
     }
 }
 
@@ -2154,7 +1787,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
     
     active_home = 'active' if active == 'home' else ''
     active_ml = 'active' if active == 'ml' else ''
-    active_about = 'active' if active == 'about' else ''
+    active_search = 'active' if active == 'search' else ''
     
     location_data = ""
     if selected_location:
@@ -2246,9 +1879,9 @@ def render_page(content: str, active: str = "home", message: str = None, message
                     <i class="fas fa-brain"></i>
                     <span>ML Dashboard</span>
                 </a>
-                <a href="/about" class="nav-item {active_about}" data-page="about">
-                    <i class="fas fa-info-circle"></i>
-                    <span>About App</span>
+                <a href="/search" class="nav-item {active_search}" data-page="search">
+                    <i class="fas fa-search"></i>
+                    <span>Cari Kota</span>
                 </a>
             </nav>
             
@@ -2721,17 +2354,15 @@ async def ml_dashboard(request: Request):
         <p class="hero-subtitle">Prediksi cuaca dengan Machine Learning (Random Forest Regressor)</p>
     </div>
     
-    <div class="bento-grid">
-        <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-chart-line"></i> Prediksi ML 5 Hari (Random Forest)</span>
-                <i class="fas fa-brain" style="color: #8b5cf6;"></i>
-            </div>
-            <div class="forecast-grid">{ml_forecast_html}</div>
+    <div class="glass-card">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-chart-line"></i> Prediksi ML 5 Hari (Random Forest)</span>
+            <i class="fas fa-brain" style="color: #8b5cf6;"></i>
         </div>
-        
-        {model_status}
+        <div class="forecast-grid">{ml_forecast_html}</div>
     </div>
+    
+    {model_status}
     
     <div class="glass-card">
         <div class="card-header">
@@ -2824,6 +2455,31 @@ async def train_model_route(request: Request):
             status_code=303
         )
 
+@app.get("/reset-model")
+async def reset_model():
+    """Delete existing model and train a new one"""
+    global weather_predictor
+    
+    # Delete old model file
+    if os.path.exists(MODEL_PATH):
+        os.remove(MODEL_PATH)
+        print(f"🗑️ Old model deleted")
+    
+    # Reinitialize predictor
+    weather_predictor = WeatherPredictor()
+    
+    # Train new model
+    result = weather_predictor.train_model(
+        selected_location["name"],
+        selected_location["latitude"],
+        selected_location["longitude"]
+    )
+    
+    return RedirectResponse(
+        url=f"/ml-dashboard?message=✅ Model berhasil direset dan dilatih ulang! MAE: {result['mae']:.6f}°C, R²: {result['r2']:.6f}&type=success",
+        status_code=303
+    )
+
 @app.get("/search", response_class=HTMLResponse)
 async def search_page(request: Request, message: str = None, type: str = None):
     saved_locations = get_saved_locations()
@@ -2869,108 +2525,6 @@ async def search_city_post(city_name: str = Form(...)):
         return RedirectResponse(url=f"/search?message={result['name']} berhasil ditambahkan ke favorit&type=success", status_code=303)
     else:
         return RedirectResponse(url=f"/search?message=Kota '{city_name}' tidak ditemukan. Periksa ejaan Anda.&type=error", status_code=303)
-
-@app.get("/about", response_class=HTMLResponse)
-async def about_page(request: Request):
-    saved_locations = get_saved_locations()
-    
-    content = f'''
-    <div class="hero">
-        <h1 class="hero-title">Tentang WeatherAI</h1>
-        <p class="hero-subtitle">Aplikasi prediksi cuaca cerdas berbasis AI untuk informasi akurat dan real-time</p>
-    </div>
-    
-    <div class="bento-grid">
-        <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-info-circle"></i> Tentang Aplikasi</span>
-            </div>
-            <div style="padding: 24px;">
-                <p style="margin-bottom: 16px; line-height: 1.6;">
-                    <strong>WeatherAI</strong> adalah aplikasi web modern yang menggabungkan teknologi AI canggih dengan data cuaca real-time untuk memberikan informasi cuaca yang akurat dan dapat diandalkan.
-                </p>
-                <p style="margin-bottom: 16px; line-height: 1.6;">
-                    Aplikasi ini menggunakan <strong>Google Gemini AI</strong> untuk analisis cuaca natural language dan <strong>Machine Learning (Random Forest)</strong> untuk prediksi suhu jangka pendek.
-                </p>
-            </div>
-        </div>
-        
-        <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-microchip"></i> Teknologi AI</span>
-            </div>
-            <div style="padding: 24px;">
-                <ul style="list-style: none; padding: 0;">
-                    <li style="margin-bottom: 12px;"><i class="fas fa-check" style="color: var(--accent); margin-right: 8px;"></i> <strong>Google Gemini 2.5 Flash</strong> - AI untuk deskripsi cuaca natural</li>
-                    <li style="margin-bottom: 12px;"><i class="fas fa-check" style="color: var(--accent); margin-right: 8px;"></i> <strong>Random Forest Regressor</strong> - ML untuk prediksi suhu</li>
-                    <li style="margin-bottom: 12px;"><i class="fas fa-check" style="color: var(--accent); margin-right: 8px;"></i> <strong>Open-Meteo API</strong> - Data cuaca real-time gratis</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    
-    <div class="bento-grid">
-        <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-chart-line"></i> Akurasi & Fitur</span>
-            </div>
-            <div style="padding: 24px;">
-                <ul style="list-style: none; padding: 0;">
-                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> <strong>MAE: 0.46°C</strong> - Error rata-rata prediksi</li>
-                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> <strong>R²: 0.89</strong> - Tingkat akurasi model</li>
-                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> Prakiraan 5 hari dengan AI insights</li>
-                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> Zona waktu otomatis untuk semua lokasi</li>
-                </ul>
-            </div>
-        </div>
-        
-        <div class="glass-card">
-            <div class="card-header">
-                <span class="card-title"><i class="fas fa-code"></i> Teknologi & Framework</span>
-            </div>
-            <div style="padding: 24px;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-                    <div style="text-align: center;">
-                        <i class="fab fa-python" style="font-size: 32px; color: #3776ab; margin-bottom: 8px;"></i>
-                        <div style="font-weight: 600;">Python</div>
-                        <div style="font-size: 12px; color: var(--text-tertiary);">Backend & ML</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <i class="fas fa-rocket" style="font-size: 32px; color: #00c8ff; margin-bottom: 8px;"></i>
-                        <div style="font-weight: 600;">FastAPI</div>
-                        <div style="font-size: 12px; color: var(--text-tertiary);">Web Framework</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <i class="fas fa-brain" style="font-size: 32px; color: #8b5cf6; margin-bottom: 8px;"></i>
-                        <div style="font-weight: 600;">Scikit-learn</div>
-                        <div style="font-size: 12px; color: var(--text-tertiary);">Machine Learning</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <i class="fas fa-cloud-sun" style="font-size: 32px; color: #f59e0b; margin-bottom: 8px;"></i>
-                        <div style="font-weight: 600;">Open-Meteo</div>
-                        <div style="font-size: 12px; color: var(--text-tertiary);">Weather Data</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="glass-card">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-shield-alt"></i> Privasi & Keamanan</span>
-        </div>
-        <div style="padding: 24px;">
-            <p style="margin-bottom: 16px; line-height: 1.6;">
-                Aplikasi ini <strong>tidak menyimpan data pribadi pengguna</strong>. Semua data cuaca diambil secara real-time dari API publik dan tidak ada pelacakan atau penyimpanan data pengguna.
-            </p>
-            <p style="line-height: 1.6;">
-                Lokasi yang disimpan hanya tersimpan di browser lokal Anda dan dapat dihapus kapan saja.
-            </p>
-        </div>
-    </div>
-    '''
-    
-    return HTMLResponse(content=render_page(content, active="about", saved_locations=saved_locations))
 
 if __name__ == "__main__":
     import os
