@@ -17,19 +17,56 @@ app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi
 
 # ============ KONFIGURASI AI API (GEMINI) ============
 import os
+
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("✅ Environment variables loaded from .env file")
+except ImportError:
+    print("ℹ️ python-dotenv not installed. Using system environment variables only.")
+    print("   Install with: pip install python-dotenv")
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_API_KEY_BACKUP = os.environ.get("GEMINI_API_KEY_BACKUP", "")
+
+def initialize_gemini_client():
+    """Initialize Gemini client with fallback API keys"""
+    api_keys = [GEMINI_API_KEY, GEMINI_API_KEY_BACKUP]
+    api_keys = [key for key in api_keys if key]  # Remove empty keys
+    
+    if not api_keys:
+        print("⚠️ Tidak ada API key Gemini yang tersedia")
+        return None, False
+    
+    for i, api_key in enumerate(api_keys, 1):
+        try:
+            client = genai.Client(api_key=api_key)
+            # Test the client with a simple request
+            test_response = client.models.generate_content(
+                model="gemini-2.0-flash-exp",
+                contents="Test connection"
+            )
+            print(f"✅ AI API (Google Gemini) siap digunakan dengan API Key {i}")
+            print("   Model: gemini-2.0-flash-exp")
+            return client, True
+        except Exception as e:
+            print(f"⚠️ API Key {i} gagal: {e}")
+            continue
+    
+    print("❌ Semua API key Gemini gagal. AI features akan dinonaktifkan.")
+    return None, False
 
 AI_AVAILABLE = False
+client = None
+
 try:
     from google import genai
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    AI_AVAILABLE = True
-    print("✅ AI API (Google Gemini) siap digunakan (GRATIS)")
-    print("   Model: gemini-2.5-flash")
+    client, AI_AVAILABLE = initialize_gemini_client()
 except ImportError:
     print("⚠️ Library google-genai belum terinstall. Install dengan: pip install google-genai")
 except Exception as e:
-    print(f"⚠️ AI API error: {e}")
+    print(f"⚠️ Error inisialisasi Gemini: {e}")
     AI_AVAILABLE = False
 
 # ============ DATABASE ============
@@ -659,7 +696,7 @@ def get_ai_insights_fallback(weather, forecast, location_name: str = None):
     return f"{opening}{precip_text}{wind_text}{uv_text}{forecast_text}"
 
 def get_ai_insights_real(weather, forecast, location_name: str = None):
-    if not AI_AVAILABLE:
+    if not AI_AVAILABLE or client is None:
         return get_ai_insights_fallback(weather, forecast, location_name)
     
     location = location_name or "Lokasi Anda"
