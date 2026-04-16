@@ -2684,15 +2684,17 @@ async def ml_dashboard(request: Request):
         <p class="hero-subtitle">Prediksi cuaca dengan Machine Learning (Random Forest Regressor)</p>
     </div>
     
-    <div class="glass-card">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-chart-line"></i> Prediksi ML 5 Hari (Random Forest)</span>
-            <i class="fas fa-brain" style="color: #8b5cf6;"></i>
+    <div class="bento-grid">
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title"><i class="fas fa-chart-line"></i> Prediksi ML 5 Hari (Random Forest)</span>
+                <i class="fas fa-brain" style="color: #8b5cf6;"></i>
+            </div>
+            <div class="forecast-grid">{ml_forecast_html}</div>
         </div>
-        <div class="forecast-grid">{ml_forecast_html}</div>
+        
+        {model_status}
     </div>
-    
-    {model_status}
     
     <div class="glass-card">
         <div class="card-header">
@@ -2841,21 +2843,21 @@ async def about_page(request: Request):
         <p class="hero-subtitle">Aplikasi prediksi cuaca cerdas berbasis AI untuk informasi akurat dan real-time</p>
     </div>
     
-    <div class="glass-card">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-info-circle"></i> Tentang Aplikasi</span>
-        </div>
-        <div style="padding: 24px;">
-            <p style="margin-bottom: 16px; line-height: 1.6;">
-                <strong>WeatherAI</strong> adalah aplikasi web modern yang menggabungkan teknologi AI canggih dengan data cuaca real-time untuk memberikan informasi cuaca yang akurat dan dapat diandalkan.
-            </p>
-            <p style="margin-bottom: 16px; line-height: 1.6;">
-                Aplikasi ini menggunakan <strong>Google Gemini AI</strong> untuk analisis cuaca natural language dan <strong>Machine Learning (Random Forest)</strong> untuk prediksi suhu jangka pendek.
-            </p>
-        </div>
-    </div>
-    
     <div class="bento-grid">
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title"><i class="fas fa-info-circle"></i> Tentang Aplikasi</span>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin-bottom: 16px; line-height: 1.6;">
+                    <strong>WeatherAI</strong> adalah aplikasi web modern yang menggabungkan teknologi AI canggih dengan data cuaca real-time untuk memberikan informasi cuaca yang akurat dan dapat diandalkan.
+                </p>
+                <p style="margin-bottom: 16px; line-height: 1.6;">
+                    Aplikasi ini menggunakan <strong>Google Gemini AI</strong> untuk analisis cuaca natural language dan <strong>Machine Learning (Random Forest)</strong> untuk prediksi suhu jangka pendek.
+                </p>
+            </div>
+        </div>
+        
         <div class="glass-card">
             <div class="card-header">
                 <span class="card-title"><i class="fas fa-microchip"></i> Teknologi AI</span>
@@ -2868,7 +2870,9 @@ async def about_page(request: Request):
                 </ul>
             </div>
         </div>
-        
+    </div>
+    
+    <div class="bento-grid">
         <div class="glass-card">
             <div class="card-header">
                 <span class="card-title"><i class="fas fa-chart-line"></i> Akurasi & Fitur</span>
@@ -2882,33 +2886,33 @@ async def about_page(request: Request):
                 </ul>
             </div>
         </div>
-    </div>
-    
-    <div class="glass-card">
-        <div class="card-header">
-            <span class="card-title"><i class="fas fa-code"></i> Teknologi & Framework</span>
-        </div>
-        <div style="padding: 24px;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-                <div style="text-align: center;">
-                    <i class="fab fa-python" style="font-size: 32px; color: #3776ab; margin-bottom: 8px;"></i>
-                    <div style="font-weight: 600;">Python</div>
-                    <div style="font-size: 12px; color: var(--text-tertiary);">Backend & ML</div>
-                </div>
-                <div style="text-align: center;">
-                    <i class="fas fa-rocket" style="font-size: 32px; color: #00c8ff; margin-bottom: 8px;"></i>
-                    <div style="font-weight: 600;">FastAPI</div>
-                    <div style="font-size: 12px; color: var(--text-tertiary);">Web Framework</div>
-                </div>
-                <div style="text-align: center;">
-                    <i class="fas fa-brain" style="font-size: 32px; color: #8b5cf6; margin-bottom: 8px;"></i>
-                    <div style="font-weight: 600;">Scikit-learn</div>
-                    <div style="font-size: 12px; color: var(--text-tertiary);">Machine Learning</div>
-                </div>
-                <div style="text-align: center;">
-                    <i class="fas fa-cloud-sun" style="font-size: 32px; color: #f59e0b; margin-bottom: 8px;"></i>
-                    <div style="font-weight: 600;">Open-Meteo</div>
-                    <div style="font-size: 12px; color: var(--text-tertiary);">Weather Data</div>
+        
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title"><i class="fas fa-code"></i> Teknologi & Framework</span>
+            </div>
+            <div style="padding: 24px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                    <div style="text-align: center;">
+                        <i class="fab fa-python" style="font-size: 32px; color: #3776ab; margin-bottom: 8px;"></i>
+                        <div style="font-weight: 600;">Python</div>
+                        <div style="font-size: 12px; color: var(--text-tertiary);">Backend & ML</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <i class="fas fa-rocket" style="font-size: 32px; color: #00c8ff; margin-bottom: 8px;"></i>
+                        <div style="font-weight: 600;">FastAPI</div>
+                        <div style="font-size: 12px; color: var(--text-tertiary);">Web Framework</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <i class="fas fa-brain" style="font-size: 32px; color: #8b5cf6; margin-bottom: 8px;"></i>
+                        <div style="font-weight: 600;">Scikit-learn</div>
+                        <div style="font-size: 12px; color: var(--text-tertiary);">Machine Learning</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <i class="fas fa-cloud-sun" style="font-size: 32px; color: #f59e0b; margin-bottom: 8px;"></i>
+                        <div style="font-weight: 600;">Open-Meteo</div>
+                        <div style="font-size: 12px; color: var(--text-tertiary);">Weather Data</div>
+                    </div>
                 </div>
             </div>
         </div>
