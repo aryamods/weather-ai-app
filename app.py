@@ -2117,7 +2117,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
     
     active_home = 'active' if active == 'home' else ''
     active_ml = 'active' if active == 'ml' else ''
-    active_search = 'active' if active == 'search' else ''
+    active_about = 'active' if active == 'about' else ''
     
     location_data = ""
     if selected_location:
@@ -2209,9 +2209,9 @@ def render_page(content: str, active: str = "home", message: str = None, message
                     <i class="fas fa-brain"></i>
                     <span>ML Dashboard</span>
                 </a>
-                <a href="/search" class="nav-item {active_search}" data-page="search">
-                    <i class="fas fa-search"></i>
-                    <span>Cari Kota</span>
+                <a href="/about" class="nav-item {active_about}" data-page="about">
+                    <i class="fas fa-info-circle"></i>
+                    <span>About App</span>
                 </a>
             </nav>
             
@@ -2830,6 +2830,106 @@ async def search_city_post(city_name: str = Form(...)):
         return RedirectResponse(url=f"/search?message={result['name']} berhasil ditambahkan ke favorit&type=success", status_code=303)
     else:
         return RedirectResponse(url=f"/search?message=Kota '{city_name}' tidak ditemukan. Periksa ejaan Anda.&type=error", status_code=303)
+
+@app.get("/about", response_class=HTMLResponse)
+async def about_page(request: Request):
+    saved_locations = get_saved_locations()
+    
+    content = f'''
+    <div class="hero">
+        <h1 class="hero-title">Tentang WeatherAI</h1>
+        <p class="hero-subtitle">Aplikasi prediksi cuaca cerdas berbasis AI untuk informasi akurat dan real-time</p>
+    </div>
+    
+    <div class="glass-card">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-info-circle"></i> Tentang Aplikasi</span>
+        </div>
+        <div style="padding: 24px;">
+            <p style="margin-bottom: 16px; line-height: 1.6;">
+                <strong>WeatherAI</strong> adalah aplikasi web modern yang menggabungkan teknologi AI canggih dengan data cuaca real-time untuk memberikan informasi cuaca yang akurat dan dapat diandalkan.
+            </p>
+            <p style="margin-bottom: 16px; line-height: 1.6;">
+                Aplikasi ini menggunakan <strong>Google Gemini AI</strong> untuk analisis cuaca natural language dan <strong>Machine Learning (Random Forest)</strong> untuk prediksi suhu jangka pendek.
+            </p>
+        </div>
+    </div>
+    
+    <div class="bento-grid">
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title"><i class="fas fa-microchip"></i> Teknologi AI</span>
+            </div>
+            <div style="padding: 24px;">
+                <ul style="list-style: none; padding: 0;">
+                    <li style="margin-bottom: 12px;"><i class="fas fa-check" style="color: var(--accent); margin-right: 8px;"></i> <strong>Google Gemini 2.5 Flash</strong> - AI untuk deskripsi cuaca natural</li>
+                    <li style="margin-bottom: 12px;"><i class="fas fa-check" style="color: var(--accent); margin-right: 8px;"></i> <strong>Random Forest Regressor</strong> - ML untuk prediksi suhu</li>
+                    <li style="margin-bottom: 12px;"><i class="fas fa-check" style="color: var(--accent); margin-right: 8px;"></i> <strong>Open-Meteo API</strong> - Data cuaca real-time gratis</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="glass-card">
+            <div class="card-header">
+                <span class="card-title"><i class="fas fa-chart-line"></i> Akurasi & Fitur</span>
+            </div>
+            <div style="padding: 24px;">
+                <ul style="list-style: none; padding: 0;">
+                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> <strong>MAE: 0.46°C</strong> - Error rata-rata prediksi</li>
+                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> <strong>R²: 0.89</strong> - Tingkat akurasi model</li>
+                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> Prakiraan 5 hari dengan AI insights</li>
+                    <li style="margin-bottom: 12px;"><i class="fas fa-star" style="color: #fbbf24; margin-right: 8px;"></i> Zona waktu otomatis untuk semua lokasi</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="glass-card">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-code"></i> Teknologi & Framework</span>
+        </div>
+        <div style="padding: 24px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                <div style="text-align: center;">
+                    <i class="fab fa-python" style="font-size: 32px; color: #3776ab; margin-bottom: 8px;"></i>
+                    <div style="font-weight: 600;">Python</div>
+                    <div style="font-size: 12px; color: var(--text-tertiary);">Backend & ML</div>
+                </div>
+                <div style="text-align: center;">
+                    <i class="fas fa-rocket" style="font-size: 32px; color: #00c8ff; margin-bottom: 8px;"></i>
+                    <div style="font-weight: 600;">FastAPI</div>
+                    <div style="font-size: 12px; color: var(--text-tertiary);">Web Framework</div>
+                </div>
+                <div style="text-align: center;">
+                    <i class="fas fa-brain" style="font-size: 32px; color: #8b5cf6; margin-bottom: 8px;"></i>
+                    <div style="font-weight: 600;">Scikit-learn</div>
+                    <div style="font-size: 12px; color: var(--text-tertiary);">Machine Learning</div>
+                </div>
+                <div style="text-align: center;">
+                    <i class="fas fa-cloud-sun" style="font-size: 32px; color: #f59e0b; margin-bottom: 8px;"></i>
+                    <div style="font-weight: 600;">Open-Meteo</div>
+                    <div style="font-size: 12px; color: var(--text-tertiary);">Weather Data</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="glass-card">
+        <div class="card-header">
+            <span class="card-title"><i class="fas fa-shield-alt"></i> Privasi & Keamanan</span>
+        </div>
+        <div style="padding: 24px;">
+            <p style="margin-bottom: 16px; line-height: 1.6;">
+                Aplikasi ini <strong>tidak menyimpan data pribadi pengguna</strong>. Semua data cuaca diambil secara real-time dari API publik dan tidak ada pelacakan atau penyimpanan data pengguna.
+            </p>
+            <p style="line-height: 1.6;">
+                Lokasi yang disimpan hanya tersimpan di browser lokal Anda dan dapat dihapus kapan saja.
+            </p>
+        </div>
+    </div>
+    '''
+    
+    return HTMLResponse(content=render_page(content, active="about", saved_locations=saved_locations))
 
 if __name__ == "__main__":
     import os
