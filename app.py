@@ -534,12 +534,14 @@ class WeatherPredictor:
                 saved = joblib.load(MODEL_PATH)
                 self.model = saved['model']
                 self.features = saved['features']
-                print(f"✅ Model dimuat dari {MODEL_PATH}")
+                print("✅ Model loaded")
                 return True
-            except Exception as e:
-                print(f"⚠️ Gagal memuat model: {e}")
-                return False
-        return False
+            except:
+                 return False
+        else:
+            print("⚠️ Model tidak ada, training ulang...")
+            self.train_model()
+            return True
     
     def predict_temperature(self, current_weather):
         if self.model is None:
@@ -574,8 +576,8 @@ class WeatherPredictor:
                 'temp_lag_24': last_temps[-24] if len(last_temps) >= 24 else current_temp,
             }
             
-            feature_array = np.array([[features[col] for col in self.features]])
-            pred_temp = self.model.predict(feature_array)[0]
+            feature_df = pd.DataFrame([features])[self.features]
+            pred_temp = self.model.predict(feature_df)[0]
             
             hour_factor = 2 * np.sin(2 * np.pi * (hour - 14) / 24)
             final_temp = pred_temp + hour_factor
