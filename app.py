@@ -12,6 +12,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 import os
+import warnings
+warnings.filterwarnings('ignore')
 
 app = FastAPI(title="WeatherAI | Aura Dashboard", description="Aplikasi Prediksi Cuaca Cerdas Berbasis AI", version="3.0.0")
 
@@ -512,9 +514,11 @@ class WeatherPredictor:
         print(f"   📈 Mean Absolute Error: {mae:.2f}°C")
         print(f"   📊 R² Score: {r2:.3f}")
         
+        # Simpan model dengan metadata termasuk feature names
         joblib.dump({
             'model': self.model,
             'features': feature_cols,
+            'feature_names': feature_cols,  # Simpan feature names untuk validasi
             'mae': mae,
             'r2': r2,
             'location': location_name
@@ -534,14 +538,18 @@ class WeatherPredictor:
                 saved = joblib.load(MODEL_PATH)
                 self.model = saved['model']
                 self.features = saved['features']
-                print("✅ Model loaded")
+                print(f"✅ Model dimuat dari {MODEL_PATH}")
                 return True
-            except:
-                 return False
-        else:
-            print("⚠️ Model tidak ada, training ulang...")
-            self.train_model()
-            return True
+            except Exception as e:
+                print(f"⚠️ Gagal memuat model: {e}")
+                # Hapus file model yang corrupt
+                try:
+                    os.remove(MODEL_PATH)
+                    print("🗑️ File model corrupt dihapus")
+                except:
+                    pass
+                return False
+        return False
     
     def predict_temperature(self, current_weather):
         if self.model is None:
@@ -561,7 +569,8 @@ class WeatherPredictor:
             else:
                 current_temp = predictions[-1]['temp_max']
             
-            features = {
+            # Buat dictionary features dengan urutan yang sama seperti saat training
+            features_dict = {
                 'humidity': current_weather.get('humidity', 70),
                 'precipitation': current_weather.get('precipitation', 0),
                 'wind_speed': current_weather.get('wind_speed', 10),
@@ -576,8 +585,9 @@ class WeatherPredictor:
                 'temp_lag_24': last_temps[-24] if len(last_temps) >= 24 else current_temp,
             }
             
-            feature_df = pd.DataFrame([features])[self.features]
-            pred_temp = self.model.predict(feature_df)[0]
+            # Buat array dengan urutan fitur yang benar
+            feature_array = np.array([[features_dict[col] for col in self.features]])
+            pred_temp = self.model.predict(feature_array)[0]
             
             hour_factor = 2 * np.sin(2 * np.pi * (hour - 14) / 24)
             final_temp = pred_temp + hour_factor
