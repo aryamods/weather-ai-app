@@ -2203,7 +2203,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
     <div class="loader-wrapper" id="loaderWrapper">
         <div class="loader">
             <div class="cloud-loader">
-                <i class="fas fa-cloud-sun"></i>
+                <img src="https://aryamods.rf.gd/images/weatherai.svg" alt="WeatherAI Logo" style="width: 64px; height: 64px;">
             </div>
             <div class="loader-text">
                 WeatherAI<span class="loader-dots"></span>
@@ -2242,10 +2242,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo-icon">
-                    <i class="fas fa-cloud-sun"></i>
-                </div>
-                <div>
-                    <div class="sidebar-logo-text">WeatherAI</div>
+                    <img src="https://aryamods.rf.gd/images/weatherai.svg" alt="WeatherAI Logo" style="width: 40px; height: 40px;">
                 </div>
             </div>
             
