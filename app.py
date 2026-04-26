@@ -1346,9 +1346,10 @@ body::before {
 .sidebar-header {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 14px;
     margin-bottom: 40px;
-    padding: 12px 18px 24px 18px;
+    padding: 24px 0;
     border-bottom: 1px solid var(--border-color);
     width: calc(100% + 40px);
     margin-left: -20px;
@@ -1360,19 +1361,19 @@ body::before {
     height: auto;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: center;
     font-size: 24px;
     color: white;
     transition: var(--transition);
 }
 
 .sidebar-logo-icon:hover {
-    transform: scale(1.05);
+    transform: scale(1.08);
 }
 
 .sidebar-logo-icon img {
     width: auto;
-    height: 48px;
+    height: 80px;
 }
 
 @keyframes logoPulse {
