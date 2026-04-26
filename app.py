@@ -1373,7 +1373,7 @@ body::before {
 
 .sidebar-logo-icon img {
     width: auto;
-    height: 80px;
+    height: 140px;
 }
 
 @keyframes logoPulse {
