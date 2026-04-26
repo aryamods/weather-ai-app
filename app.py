@@ -1350,31 +1350,32 @@ body::before {
     margin-bottom: 40px;
     padding-bottom: 24px;
     border-bottom: 1px solid var(--border-color);
+    width: 100%;
 }
 
 .sidebar-logo-icon {
-    width: 48px;
-    height: 48px;
-    background: var(--accent-gradient);
-    border-radius: 16px;
+    width: 100%;
+    height: auto;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     font-size: 24px;
     color: white;
-    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
-    animation: logoPulse 2s ease infinite;
     transition: var(--transition);
 }
 
 .sidebar-logo-icon:hover {
-    transform: scale(1.1) rotate(5deg);
-    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.5);
+    transform: scale(1.05);
+}
+
+.sidebar-logo-icon img {
+    width: auto;
+    height: 48px;
 }
 
 @keyframes logoPulse {
-    0%, 100% { box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); }
-    50% { box-shadow: 0 8px 30px rgba(59, 130, 246, 0.6); }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.9; }
 }
 
 .sidebar-logo-text {
@@ -2242,7 +2243,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo-icon">
-                    <img src="https://aryamods.rf.gd/images/weatherai.svg" alt="WeatherAI Logo" style="width: 40px; height: 40px;">
+                    <img src="https://aryamods.rf.gd/images/weatherai.svg" alt="WeatherAI Logo" style="height: 50px; width: auto;">
                 </div>
             </div>
             
