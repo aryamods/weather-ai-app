@@ -1348,9 +1348,11 @@ body::before {
     align-items: center;
     gap: 14px;
     margin-bottom: 40px;
-    padding-bottom: 24px;
+    padding: 12px 18px 24px 18px;
     border-bottom: 1px solid var(--border-color);
-    width: 100%;
+    width: calc(100% + 40px);
+    margin-left: -20px;
+    margin-right: -20px;
 }
 
 .sidebar-logo-icon {
