@@ -1346,39 +1346,35 @@ body::before {
 .sidebar-header {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 14px;
     margin-bottom: 40px;
-    padding: 24px 0;
+    padding-bottom: 24px;
     border-bottom: 1px solid var(--border-color);
-    width: calc(100% + 40px);
-    margin-left: -20px;
-    margin-right: -20px;
 }
 
 .sidebar-logo-icon {
-    width: 100%;
-    height: auto;
+    width: 48px;
+    height: 48px;
+    background: var(--accent-gradient);
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
     color: white;
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+    animation: logoPulse 2s ease infinite;
     transition: var(--transition);
 }
 
 .sidebar-logo-icon:hover {
-    transform: scale(1.08);
-}
-
-.sidebar-logo-icon img {
-    width: auto;
-    height: 2200px;
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 12px 30px rgba(59, 130, 246, 0.5);
 }
 
 @keyframes logoPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.9; }
+    0%, 100% { box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); }
+    50% { box-shadow: 0 8px 30px rgba(59, 130, 246, 0.6); }
 }
 
 .sidebar-logo-text {
@@ -2207,7 +2203,7 @@ def render_page(content: str, active: str = "home", message: str = None, message
     <div class="loader-wrapper" id="loaderWrapper">
         <div class="loader">
             <div class="cloud-loader">
-                <img src="https://aryamods.rf.gd/images/weatherai.svg" alt="WeatherAI Logo" style="width: 64px; height: 64px;">
+                <i class="fas fa-cloud-sun"></i>
             </div>
             <div class="loader-text">
                 WeatherAI<span class="loader-dots"></span>
@@ -2246,7 +2242,10 @@ def render_page(content: str, active: str = "home", message: str = None, message
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo-icon">
-                    <img src="https://aryamods.rf.gd/images/weatherai.svg" alt="WeatherAI Logo" style="height: 50px; width: auto;">
+                    <i class="fas fa-cloud-sun"></i>
+                </div>
+                <div>
+                    <div class="sidebar-logo-text">WeatherAI</div>
                 </div>
             </div>
             
